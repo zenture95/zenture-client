@@ -201,8 +201,6 @@ class AsyncRunsResource:
             idempotency_key=idempotency_key,
             profile=profile,
         )
-        if not proposal.start_admissible:
-            raise ValueError("Prepare proposal is not currently admissible")
         return await self.create(
             proposal_id=str(proposal.proposal_id),
             proposal_hash=proposal.proposal_hash,

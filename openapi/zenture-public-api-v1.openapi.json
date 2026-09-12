@@ -397,6 +397,9 @@
           "mode": {
             "const": "prompt_improvement",
             "description": "Only supported input wizard mode.",
+            "enum": [
+              "prompt_improvement"
+            ],
             "title": "Mode",
             "type": "string"
           },
@@ -489,8 +492,10 @@
         "additionalProperties": false,
         "properties": {
           "estimated_credits": {
-            "nullable": true,
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "expected_duration_seconds": {
             "maximum": 86400,
@@ -504,8 +509,10 @@
           "guest_slot_cost": {
             "maximum": 1,
             "minimum": 0,
-            "nullable": true,
-            "type": "integer"
+            "type": [
+              "integer",
+              "null"
+            ]
           },
           "inferred_work_type": {
             "maxLength": 64,
@@ -513,8 +520,10 @@
             "type": "string"
           },
           "maximum_credits": {
-            "nullable": true,
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "planned_checks": {
             "items": {
@@ -1247,24 +1256,30 @@
         "properties": {
           "estimate_as_of": {
             "format": "date-time",
-            "nullable": true,
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "estimated_completion_seconds": {
             "additionalProperties": {
               "minimum": 0,
               "type": "integer"
             },
-            "nullable": true,
-            "type": "object"
+            "type": [
+              "object",
+              "null"
+            ]
           },
           "estimated_start_seconds": {
             "additionalProperties": {
               "minimum": 0,
               "type": "integer"
             },
-            "nullable": true,
-            "type": "object"
+            "type": [
+              "object",
+              "null"
+            ]
           },
           "jobs_ahead": {
             "maximum": 50,
@@ -1323,8 +1338,10 @@
           },
           "next_cursor": {
             "maxLength": 512,
-            "nullable": true,
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "runs": {
             "items": {
@@ -1352,8 +1369,10 @@
           },
           "next_action": {
             "maxLength": 128,
-            "nullable": true,
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "retryable": {
             "default": false,
@@ -1415,11 +1434,41 @@
         "properties": {
           "estimated_completion_seconds": {
             "additionalProperties": false,
-            "type": "object"
+            "properties": {
+              "max": {
+                "maximum": 604800,
+                "minimum": 0,
+                "type": "integer"
+              },
+              "min": {
+                "maximum": 604800,
+                "minimum": 0,
+                "type": "integer"
+              }
+            },
+            "type": [
+              "object",
+              "null"
+            ]
           },
           "estimated_start_seconds": {
             "additionalProperties": false,
-            "type": "object"
+            "properties": {
+              "max": {
+                "maximum": 86400,
+                "minimum": 0,
+                "type": "integer"
+              },
+              "min": {
+                "maximum": 86400,
+                "minimum": 0,
+                "type": "integer"
+              }
+            },
+            "type": [
+              "object",
+              "null"
+            ]
           },
           "event_cursor": {
             "maxLength": 512,
@@ -1436,28 +1485,22 @@
           "jobs_ahead": {
             "maximum": 50,
             "minimum": 0,
-            "type": "integer"
+            "type": [
+              "integer",
+              "null"
+            ]
           },
           "message_key": {
             "pattern": "^[a-z][a-z0-9_.-]{0,127}$",
             "type": "string"
           },
-          "phase": {
-            "enum": [
-              "queued",
-              "preparing",
-              "running",
-              "completed",
-              "degraded",
-              "failed",
-              "cancelled"
-            ],
-            "type": "string"
-          },
           "progress_percent": {
             "maximum": 100,
             "minimum": 0,
-            "type": "integer"
+            "type": [
+              "integer",
+              "null"
+            ]
           },
           "run_id": {
             "pattern": "^run_[A-Za-z0-9_-]{3,128}$",
@@ -1498,8 +1541,9 @@
           "event_id",
           "run_id",
           "sequence",
-          "phase",
-          "status"
+          "status",
+          "message_key",
+          "event_cursor"
         ],
         "type": "object"
       },
@@ -1517,8 +1561,10 @@
           },
           "next_cursor": {
             "maxLength": 512,
-            "nullable": true,
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           }
         },
         "required": [
@@ -1538,8 +1584,10 @@
             "type": "string"
           },
           "decision": {
-            "nullable": true,
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "profile": {
             "enum": [
@@ -1557,8 +1605,10 @@
             "type": "string"
           },
           "task_summary_ref": {
-            "nullable": true,
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "updated_at": {
             "format": "date-time",
@@ -1582,10 +1632,13 @@
               "ready",
               "revise",
               "human_review",
-              "insufficient_evidence"
+              "insufficient_evidence",
+              null
             ],
-            "nullable": true,
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "artifact_refs": {
             "items": {
@@ -1608,21 +1661,31 @@
             "type": "boolean"
           },
           "capability_coverage": {
-            "$ref": "#/components/schemas/PublicCapabilityCoverage",
-            "nullable": true
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PublicCapabilityCoverage"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "completed_at": {
             "format": "date-time",
-            "nullable": true,
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "created_at": {
             "format": "date-time",
             "type": "string"
           },
           "event_cursor": {
-            "nullable": true,
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "family": {
             "const": "knowledge",
@@ -1641,8 +1704,10 @@
           },
           "next_action": {
             "maxLength": 128,
-            "nullable": true,
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "profile": {
             "enum": [
@@ -1653,13 +1718,21 @@
             "type": "string"
           },
           "queue": {
-            "$ref": "#/components/schemas/PublicQueueProjection",
-            "nullable": true
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PublicQueueProjection"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "reason_code": {
             "maxLength": 128,
-            "nullable": true,
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "run_id": {
             "pattern": "^run_[A-Za-z0-9_-]{3,128}$",
@@ -1667,13 +1740,17 @@
           },
           "run_insight_ref": {
             "maxLength": 256,
-            "nullable": true,
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "started_at": {
             "format": "date-time",
-            "nullable": true,
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "status": {
             "enum": [
@@ -1693,8 +1770,14 @@
             "type": "string"
           },
           "task_contract_summary": {
-            "$ref": "#/components/schemas/PublicTaskContractSummary",
-            "nullable": true
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PublicTaskContractSummary"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "updated_at": {
             "format": "date-time",
@@ -1732,10 +1815,13 @@
               "ready",
               "revise",
               "human_review",
-              "insufficient_evidence"
+              "insufficient_evidence",
+              null
             ],
-            "nullable": true,
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "artifact_refs": {
             "items": {
@@ -1758,21 +1844,31 @@
             "type": "boolean"
           },
           "capability_coverage": {
-            "$ref": "#/components/schemas/PublicCapabilityCoverage",
-            "nullable": true
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PublicCapabilityCoverage"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "completed_at": {
             "format": "date-time",
-            "nullable": true,
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "created_at": {
             "format": "date-time",
             "type": "string"
           },
           "event_cursor": {
-            "nullable": true,
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "family": {
             "const": "knowledge",
@@ -1791,8 +1887,10 @@
           },
           "next_action": {
             "maxLength": 128,
-            "nullable": true,
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "profile": {
             "enum": [
@@ -1803,13 +1901,21 @@
             "type": "string"
           },
           "queue": {
-            "$ref": "#/components/schemas/PublicQueueProjection",
-            "nullable": true
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PublicQueueProjection"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "reason_code": {
             "maxLength": 128,
-            "nullable": true,
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "run_id": {
             "pattern": "^run_[A-Za-z0-9_-]{3,128}$",
@@ -1817,13 +1923,17 @@
           },
           "run_insight_ref": {
             "maxLength": 256,
-            "nullable": true,
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "started_at": {
             "format": "date-time",
-            "nullable": true,
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "status": {
             "enum": [
@@ -1843,8 +1953,14 @@
             "type": "string"
           },
           "task_contract_summary": {
-            "$ref": "#/components/schemas/PublicTaskContractSummary",
-            "nullable": true
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PublicTaskContractSummary"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "updated_at": {
             "format": "date-time",
@@ -1889,8 +2005,10 @@
           },
           "upload_url": {
             "maxLength": 2048,
-            "nullable": true,
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           }
         },
         "required": [
@@ -2067,9 +2185,11 @@
           "edited_artifact_ref": {
             "maxLength": 132,
             "minLength": 7,
-            "nullable": true,
             "pattern": "^art_[A-Za-z0-9_-]{3,128}$",
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "finding_adjudications": {
             "items": {

@@ -84,7 +84,6 @@ def _sse_event(*, event_id: str, sequence: int, status: str, event_cursor: str) 
         "event_id": event_id,
         "run_id": RUN_ID,
         "sequence": sequence,
-        "phase": status,
         "status": status,
         "message_key": f"run.status.{status}",
         "event_cursor": event_cursor,
@@ -125,7 +124,6 @@ def _sse_message_for_run(message_type: str, run_id: str) -> bytes:
     }
     if message_type == "run.event":
         common.update(
-            phase="running",
             status="running",
             message_key="run.status.running",
             event_cursor="cursor_foreign",
@@ -257,7 +255,6 @@ def test_sync_replay_rejects_an_event_for_a_foreign_run() -> None:
                 "event_id": "event_foreign",
                 "run_id": "run_aaaaaaaaaaaaaaaa",
                 "sequence": 1,
-                "phase": "running",
                 "status": "running",
                 "message_key": "run.status.running",
                 "event_cursor": "cursor_foreign",
@@ -445,7 +442,6 @@ async def test_async_replay_rejects_an_event_for_a_foreign_run() -> None:
                 "event_id": "event_foreign",
                 "run_id": "run_aaaaaaaaaaaaaaaa",
                 "sequence": 1,
-                "phase": "running",
                 "status": "running",
                 "message_key": "run.status.running",
                 "event_cursor": "cursor_foreign",
@@ -1296,13 +1292,13 @@ async def test_async_run_outcome_uses_canonical_adjudications_and_edited_artifac
 
 def test_sync_run_sse_parser_supports_event_and_heartbeat() -> None:
     stream = b"""event: run.event
-data: {\"type\":\"run.event\",\"event_id\":\"event_aaaaaaaa\",\"run_id\":\"run_33333333333343338333333333333333\",\"sequence\":1,\"phase\":\"queued\",\"status\":\"queued\",\"message_key\":\"run.status.queued\",\"event_cursor\":\"cursor_aaa\"}
+data: {\"type\":\"run.event\",\"event_id\":\"event_aaaaaaaa\",\"run_id\":\"run_33333333333343338333333333333333\",\"sequence\":1,\"status\":\"queued\",\"message_key\":\"run.status.queued\",\"event_cursor\":\"cursor_aaa\"}
 
 event: run.heartbeat
 data: {\"type\":\"run.heartbeat\",\"event_id\":\"heartbeat_aaa\",\"run_id\":\"run_33333333333343338333333333333333\",\"sequence\":1}
 
 event: run.event
-data: {\"type\":\"run.event\",\"event_id\":\"event_bbbbbbbb\",\"run_id\":\"run_33333333333343338333333333333333\",\"sequence\":2,\"phase\":\"completed\",\"status\":\"completed\",\"message_key\":\"run.status.completed\",\"event_cursor\":\"cursor_bbb\"}
+data: {\"type\":\"run.event\",\"event_id\":\"event_bbbbbbbb\",\"run_id\":\"run_33333333333343338333333333333333\",\"sequence\":2,\"status\":\"completed\",\"message_key\":\"run.status.completed\",\"event_cursor\":\"cursor_bbb\"}
 
 """
 
@@ -1422,7 +1418,7 @@ async def test_async_signed_upload_omits_optional_upload_id() -> None:
 
 @pytest.mark.asyncio
 async def test_async_run_resources_match_sync_event_surface() -> None:
-    stream = b'event: run.event\ndata: {"type":"run.event","event_id":"event_aaaaaaaa","run_id":"run_33333333333343338333333333333333","sequence":1,"phase":"completed","status":"completed","message_key":"run.status.completed","event_cursor":"cursor_aaa"}\n\n'
+    stream = b'event: run.event\ndata: {"type":"run.event","event_id":"event_aaaaaaaa","run_id":"run_33333333333343338333333333333333","sequence":1,"status":"completed","message_key":"run.status.completed","event_cursor":"cursor_aaa"}\n\n'
 
     async def handler(request: httpx.Request) -> httpx.Response:
         assert request.url.path.endswith("/events/stream")
@@ -1860,7 +1856,6 @@ def test_run_event_dedupe_memory_is_bounded_for_long_streams() -> None:
                     "event_id": f"event_{sequence}",
                     "run_id": RUN_ID,
                     "sequence": sequence,
-                    "phase": "running",
                     "status": "running",
                     "message_key": "run.status.running",
                     "event_cursor": f"cursor_{sequence}",

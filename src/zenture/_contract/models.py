@@ -703,7 +703,6 @@ class PublicRunEvent(SDKBaseModel):
     event_id: str = Field(min_length=1, max_length=128, pattern=r"^[A-Za-z0-9._:-]+$")
     run_id: str = Field(pattern=r"^run_[A-Za-z0-9_-]{3,128}$")
     sequence: int = Field(ge=0)
-    phase: Literal["queued", "preparing", "running", "completed", "degraded", "failed", "cancelled"]
     status: Literal[
         "queued", "preparing", "running", "completed", "degraded", "failed", "cancelled"
     ]

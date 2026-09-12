@@ -643,7 +643,7 @@ Schema: `PublicSignedUploadResponse`
 {
   "expires_at": "example",
   "upload_id": "example",
-  "upload_url": null
+  "upload_url": "example"
 }
 ```
 
@@ -668,15 +668,15 @@ Schema: `PublicRunCollectionResponse`
 ```json
 {
   "has_more": true,
-  "next_cursor": null,
+  "next_cursor": "cursor_next",
   "runs": [
     {
       "created_at": "2026-06-15T10:00:00Z",
-      "decision": null,
+      "decision": "example",
       "profile": "fast",
       "run_id": "example",
       "status": "active",
-      "task_summary_ref": null,
+      "task_summary_ref": "example",
       "updated_at": "2026-06-15T10:00:30Z"
     }
   ]
@@ -729,27 +729,27 @@ Schema: `PublicRunResponse`
       "example"
     ]
   },
-  "completed_at": null,
+  "completed_at": "2026-06-15T10:00:30Z",
   "created_at": "2026-06-15T10:00:00Z",
-  "event_cursor": null,
+  "event_cursor": "example",
   "family": "knowledge",
   "generation": 1,
   "limitations": [
     "example"
   ],
-  "next_action": null,
+  "next_action": "example",
   "profile": "fast",
   "queue": {
-    "estimate_as_of": null,
-    "estimated_completion_seconds": null,
-    "estimated_start_seconds": null,
+    "estimate_as_of": "example",
+    "estimated_completion_seconds": "example",
+    "estimated_start_seconds": "example",
     "jobs_ahead": 1,
     "queue_reason": "example"
   },
-  "reason_code": null,
+  "reason_code": "example",
   "run_id": "example",
-  "run_insight_ref": null,
-  "started_at": null,
+  "run_insight_ref": "example",
+  "started_at": "example",
   "status": "created",
   "task_contract_summary": {
     "requirement_count": 1,
@@ -785,27 +785,27 @@ Schema: `PublicRunResponse`
       "example"
     ]
   },
-  "completed_at": null,
+  "completed_at": "2026-06-15T10:00:30Z",
   "created_at": "2026-06-15T10:00:00Z",
-  "event_cursor": null,
+  "event_cursor": "example",
   "family": "knowledge",
   "generation": 1,
   "limitations": [
     "example"
   ],
-  "next_action": null,
+  "next_action": "example",
   "profile": "fast",
   "queue": {
-    "estimate_as_of": null,
-    "estimated_completion_seconds": null,
-    "estimated_start_seconds": null,
+    "estimate_as_of": "example",
+    "estimated_completion_seconds": "example",
+    "estimated_start_seconds": "example",
     "jobs_ahead": 1,
     "queue_reason": "example"
   },
-  "reason_code": null,
+  "reason_code": "example",
   "run_id": "example",
-  "run_insight_ref": null,
-  "started_at": null,
+  "run_insight_ref": "example",
+  "started_at": "example",
   "status": "created",
   "task_contract_summary": {
     "requirement_count": 1,
@@ -851,12 +851,12 @@ Schema: `PrepareRunResponse`
 
 ```json
 {
-  "estimated_credits": null,
+  "estimated_credits": "example",
   "expected_duration_seconds": 1,
   "expires_at": "example",
-  "guest_slot_cost": null,
+  "guest_slot_cost": "example",
   "inferred_work_type": "example",
-  "maximum_credits": null,
+  "maximum_credits": "example",
   "planned_checks": [
     "example"
   ],
@@ -912,27 +912,27 @@ Schema: `PublicRunResponse`
       "example"
     ]
   },
-  "completed_at": null,
+  "completed_at": "2026-06-15T10:00:30Z",
   "created_at": "2026-06-15T10:00:00Z",
-  "event_cursor": null,
+  "event_cursor": "example",
   "family": "knowledge",
   "generation": 1,
   "limitations": [
     "example"
   ],
-  "next_action": null,
+  "next_action": "example",
   "profile": "fast",
   "queue": {
-    "estimate_as_of": null,
-    "estimated_completion_seconds": null,
-    "estimated_start_seconds": null,
+    "estimate_as_of": "example",
+    "estimated_completion_seconds": "example",
+    "estimated_start_seconds": "example",
     "jobs_ahead": 1,
     "queue_reason": "example"
   },
-  "reason_code": null,
+  "reason_code": "example",
   "run_id": "example",
-  "run_insight_ref": null,
-  "started_at": null,
+  "run_insight_ref": "example",
+  "started_at": "example",
   "status": "created",
   "task_contract_summary": {
     "requirement_count": 1,
@@ -990,27 +990,27 @@ Schema: `PublicRunResponse`
       "example"
     ]
   },
-  "completed_at": null,
+  "completed_at": "2026-06-15T10:00:30Z",
   "created_at": "2026-06-15T10:00:00Z",
-  "event_cursor": null,
+  "event_cursor": "example",
   "family": "knowledge",
   "generation": 1,
   "limitations": [
     "example"
   ],
-  "next_action": null,
+  "next_action": "example",
   "profile": "fast",
   "queue": {
-    "estimate_as_of": null,
-    "estimated_completion_seconds": null,
-    "estimated_start_seconds": null,
+    "estimate_as_of": "example",
+    "estimated_completion_seconds": "example",
+    "estimated_start_seconds": "example",
     "jobs_ahead": 1,
     "queue_reason": "example"
   },
-  "reason_code": null,
+  "reason_code": "example",
   "run_id": "example",
-  "run_insight_ref": null,
-  "started_at": null,
+  "run_insight_ref": "example",
+  "started_at": "example",
   "status": "created",
   "task_contract_summary": {
     "requirement_count": 1,
@@ -1045,14 +1045,19 @@ Schema: `PublicRunEventsResponse`
 {
   "events": [
     {
-      "estimated_completion_seconds": {},
-      "estimated_start_seconds": {},
+      "estimated_completion_seconds": {
+        "max": "example",
+        "min": "example"
+      },
+      "estimated_start_seconds": {
+        "max": "example",
+        "min": "example"
+      },
       "event_cursor": "example",
       "event_id": "example",
-      "jobs_ahead": 1,
+      "jobs_ahead": "example",
       "message_key": "example",
-      "phase": "queued",
-      "progress_percent": 1,
+      "progress_percent": "example",
       "run_id": "example",
       "sequence": 1,
       "status": "queued",
@@ -1063,7 +1068,7 @@ Schema: `PublicRunEventsResponse`
     }
   ],
   "has_more": true,
-  "next_cursor": null
+  "next_cursor": "cursor_next"
 }
 ```
 
@@ -1107,7 +1112,7 @@ Request body example:
 
 ```json
 {
-  "edited_artifact_ref": null,
+  "edited_artifact_ref": "example",
   "finding_adjudications": [
     {
       "finding_ref": "example",
@@ -1141,27 +1146,27 @@ Schema: `PublicRunOutcomeResponse`
       "example"
     ]
   },
-  "completed_at": null,
+  "completed_at": "2026-06-15T10:00:30Z",
   "created_at": "2026-06-15T10:00:00Z",
-  "event_cursor": null,
+  "event_cursor": "example",
   "family": "knowledge",
   "generation": 1,
   "limitations": [
     "example"
   ],
-  "next_action": null,
+  "next_action": "example",
   "profile": "fast",
   "queue": {
-    "estimate_as_of": null,
-    "estimated_completion_seconds": null,
-    "estimated_start_seconds": null,
+    "estimate_as_of": "example",
+    "estimated_completion_seconds": "example",
+    "estimated_start_seconds": "example",
     "jobs_ahead": 1,
     "queue_reason": "example"
   },
-  "reason_code": null,
+  "reason_code": "example",
   "run_id": "example",
-  "run_insight_ref": null,
-  "started_at": null,
+  "run_insight_ref": "example",
+  "started_at": "example",
   "status": "created",
   "task_contract_summary": {
     "requirement_count": 1,

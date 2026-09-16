@@ -183,6 +183,27 @@
         ],
         "type": "object"
       },
+      "AvailableCreditAmount": {
+        "additionalProperties": false,
+        "properties": {
+          "amount": {
+            "pattern": "^(0|[1-9][0-9]{0,11})\\.[0-9]{2}$",
+            "type": "string"
+          },
+          "status": {
+            "const": "available"
+          },
+          "unit": {
+            "const": "credits"
+          }
+        },
+        "required": [
+          "status",
+          "amount",
+          "unit"
+        ],
+        "type": "object"
+      },
       "CancelRunRequest": {
         "additionalProperties": false,
         "properties": {
@@ -270,6 +291,75 @@
         ],
         "type": "object"
       },
+      "ComposedSafeResultContentV1": {
+        "additionalProperties": false,
+        "properties": {
+          "coverage": {
+            "$ref": "#/components/schemas/SafeResultCoverage"
+          },
+          "coverage_ref": {
+            "maxLength": 256,
+            "pattern": "^coverage:[A-Za-z0-9_./:-]{1,246}$",
+            "type": "string"
+          },
+          "decision": {
+            "$ref": "#/components/schemas/SafeResultDecision"
+          },
+          "decision_ref": {
+            "maxLength": 256,
+            "pattern": "^decision:[A-Za-z0-9_./:-]{1,246}$",
+            "type": "string"
+          },
+          "evidence_summaries": {
+            "items": {
+              "$ref": "#/components/schemas/SafeResultEvidenceSummary"
+            },
+            "maxItems": 64,
+            "type": "array"
+          },
+          "findings": {
+            "items": {
+              "$ref": "#/components/schemas/SafeResultFinding"
+            },
+            "maxItems": 64,
+            "type": "array"
+          },
+          "insight_ref": {
+            "maxLength": 256,
+            "pattern": "^insight:[A-Za-z0-9_./:-]{1,247}$",
+            "type": "string"
+          },
+          "limitations": {
+            "items": {
+              "$ref": "#/components/schemas/SafeResultLimitation"
+            },
+            "maxItems": 64,
+            "type": "array"
+          },
+          "schema_version": {
+            "const": "run.composed_safe_result_content.v1"
+          },
+          "summary": {
+            "maxLength": 4000,
+            "minLength": 1,
+            "pattern": "^(?!.*(?:https?://|www\\.))[^\\u0000-\\u001F\\u007F\\u202A-\\u202E\\u2066-\\u2069<>`]*$",
+            "type": "string"
+          }
+        },
+        "required": [
+          "schema_version",
+          "summary",
+          "findings",
+          "evidence_summaries",
+          "limitations",
+          "decision",
+          "coverage",
+          "decision_ref",
+          "coverage_ref",
+          "insight_ref"
+        ],
+        "type": "object"
+      },
       "CreateApiTokenRequest": {
         "additionalProperties": false,
         "properties": {
@@ -314,6 +404,19 @@
           "proposal_hash"
         ],
         "type": "object"
+      },
+      "CreditAmountProjectionV1": {
+        "discriminator": {
+          "propertyName": "status"
+        },
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/AvailableCreditAmount"
+          },
+          {
+            "$ref": "#/components/schemas/UnavailableCreditAmount"
+          }
+        ]
       },
       "EvaluateRequest": {
         "additionalProperties": false,
@@ -397,9 +500,6 @@
           "mode": {
             "const": "prompt_improvement",
             "description": "Only supported input wizard mode.",
-            "enum": [
-              "prompt_improvement"
-            ],
             "title": "Mode",
             "type": "string"
           },
@@ -461,6 +561,26 @@
         ],
         "type": "string"
       },
+      "PrepareCreditsProjectionV1": {
+        "additionalProperties": false,
+        "properties": {
+          "estimated_credits": {
+            "$ref": "#/components/schemas/CreditAmountProjectionV1"
+          },
+          "maximum_credits": {
+            "$ref": "#/components/schemas/CreditAmountProjectionV1"
+          },
+          "schema_version": {
+            "const": "run.prepare_credits_projection.v1"
+          }
+        },
+        "required": [
+          "schema_version",
+          "estimated_credits",
+          "maximum_credits"
+        ],
+        "type": "object"
+      },
       "PrepareRunRequest": {
         "additionalProperties": false,
         "properties": {
@@ -491,10 +611,28 @@
       "PrepareRunResponse": {
         "additionalProperties": false,
         "properties": {
+          "billing_projection": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PrepareCreditsProjectionV1"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "estimated_credits": {
-            "type": [
-              "string",
-              "null"
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CreditAmountProjectionV1"
+              },
+              {
+                "deprecated": true,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
             ]
           },
           "expected_duration_seconds": {
@@ -520,9 +658,17 @@
             "type": "string"
           },
           "maximum_credits": {
-            "type": [
-              "string",
-              "null"
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CreditAmountProjectionV1"
+              },
+              {
+                "deprecated": true,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
             ]
           },
           "planned_checks": {
@@ -1650,6 +1796,16 @@
             "maxItems": 16,
             "type": "array"
           },
+          "billing_projection": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TerminalBillingProjectionV1"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "billing_summary": {
             "additionalProperties": {
               "type": "string"
@@ -1743,6 +1899,16 @@
             "type": [
               "string",
               "null"
+            ]
+          },
+          "safe_result_content": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SafeResultContentProjectionV1"
+              },
+              {
+                "type": "null"
+              }
             ]
           },
           "started_at": {
@@ -1833,6 +1999,16 @@
             "maxItems": 16,
             "type": "array"
           },
+          "billing_projection": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TerminalBillingProjectionV1"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "billing_summary": {
             "additionalProperties": {
               "type": "string"
@@ -1926,6 +2102,16 @@
             "type": [
               "string",
               "null"
+            ]
+          },
+          "safe_result_content": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SafeResultContentProjectionV1"
+              },
+              {
+                "type": "null"
+              }
             ]
           },
           "started_at": {
@@ -2214,6 +2400,280 @@
         ],
         "type": "object"
       },
+      "SafeResultContentAvailableV1": {
+        "additionalProperties": false,
+        "properties": {
+          "content": {
+            "$ref": "#/components/schemas/ComposedSafeResultContentV1"
+          },
+          "status": {
+            "const": "available"
+          }
+        },
+        "required": [
+          "status",
+          "content"
+        ],
+        "type": "object"
+      },
+      "SafeResultContentProjectionV1": {
+        "discriminator": {
+          "propertyName": "status"
+        },
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/SafeResultContentAvailableV1"
+          },
+          {
+            "$ref": "#/components/schemas/SafeResultContentUnavailableV1"
+          }
+        ]
+      },
+      "SafeResultContentUnavailableV1": {
+        "additionalProperties": false,
+        "properties": {
+          "reason_code": {
+            "enum": [
+              "legacy_result",
+              "projection_incomplete",
+              "result_content_unavailable"
+            ],
+            "type": "string"
+          },
+          "status": {
+            "const": "unavailable"
+          }
+        },
+        "required": [
+          "status",
+          "reason_code"
+        ],
+        "type": "object"
+      },
+      "SafeResultCoverage": {
+        "additionalProperties": false,
+        "properties": {
+          "coverage_ref": {
+            "maxLength": 256,
+            "pattern": "^coverage:[A-Za-z0-9_./:-]{1,246}$",
+            "type": "string"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/SafeResultCoverageItem"
+            },
+            "maxItems": 256,
+            "minItems": 1,
+            "type": "array"
+          }
+        },
+        "required": [
+          "coverage_ref",
+          "items"
+        ],
+        "type": "object"
+      },
+      "SafeResultCoverageItem": {
+        "additionalProperties": false,
+        "properties": {
+          "artifact_refs": {
+            "items": {
+              "maxLength": 512,
+              "pattern": "^[A-Za-z][A-Za-z0-9_-]*:[A-Za-z0-9_./-]{1,479}$",
+              "type": "string"
+            },
+            "maxItems": 32,
+            "type": "array"
+          },
+          "blocks_ready": {
+            "type": "boolean"
+          },
+          "check_intent_ref": {
+            "maxLength": 256,
+            "pattern": "^check-intent:[A-Za-z0-9_./:-]{1,243}$",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "reason_code": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9_.-]{1,128}$",
+            "type": "string"
+          },
+          "requirement_ref": {
+            "maxLength": 256,
+            "pattern": "^(?:review-requirement|requirement):[A-Za-z0-9_./:-]{1,237}$",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status": {
+            "enum": [
+              "performed",
+              "skipped_optional",
+              "unavailable",
+              "failed",
+              "degraded"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "reason_code",
+          "blocks_ready",
+          "artifact_refs"
+        ],
+        "type": "object"
+      },
+      "SafeResultDecision": {
+        "additionalProperties": false,
+        "properties": {
+          "next_action": {
+            "maxLength": 256,
+            "minLength": 1,
+            "pattern": "^(?!.*(?:https?://|www\\.))[^\\u0000-\\u001F\\u007F\\u202A-\\u202E\\u2066-\\u2069<>`]*$",
+            "type": "string"
+          },
+          "outcome": {
+            "enum": [
+              "ready",
+              "revise",
+              "human_review",
+              "insufficient_evidence"
+            ],
+            "type": "string"
+          },
+          "reason_code": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9_.-]{1,128}$",
+            "type": "string"
+          }
+        },
+        "required": [
+          "outcome",
+          "reason_code",
+          "next_action"
+        ],
+        "type": "object"
+      },
+      "SafeResultEvidenceSummary": {
+        "additionalProperties": false,
+        "properties": {
+          "assessment": {
+            "enum": [
+              "supported",
+              "contradicted",
+              "uncertain"
+            ],
+            "type": "string"
+          },
+          "evidence_ref": {
+            "maxLength": 256,
+            "pattern": "^evidence:[A-Za-z0-9_./:-]{1,246}$",
+            "type": "string"
+          },
+          "source_label": {
+            "maxLength": 256,
+            "minLength": 1,
+            "nullable": true,
+            "pattern": "^(?!.*(?:https?://|www\\.))[^\\u0000-\\u001F\\u007F\\u202A-\\u202E\\u2066-\\u2069<>`]*$",
+            "type": "string"
+          },
+          "summary": {
+            "maxLength": 1000,
+            "minLength": 1,
+            "pattern": "^(?!.*(?:https?://|www\\.))[^\\u0000-\\u001F\\u007F\\u202A-\\u202E\\u2066-\\u2069<>`]*$",
+            "type": "string"
+          }
+        },
+        "required": [
+          "evidence_ref",
+          "summary",
+          "assessment"
+        ],
+        "type": "object"
+      },
+      "SafeResultFinding": {
+        "additionalProperties": false,
+        "properties": {
+          "confidence": {
+            "enum": [
+              "low",
+              "medium",
+              "high"
+            ],
+            "type": "string"
+          },
+          "evidence_refs": {
+            "items": {
+              "maxLength": 256,
+              "pattern": "^evidence:[A-Za-z0-9_./:-]{1,246}$",
+              "type": "string"
+            },
+            "maxItems": 32,
+            "type": "array",
+            "uniqueItems": true
+          },
+          "explanation": {
+            "maxLength": 4000,
+            "minLength": 1,
+            "pattern": "^(?!.*(?:https?://|www\\.))[^\\u0000-\\u001F\\u007F\\u202A-\\u202E\\u2066-\\u2069<>`]*$",
+            "type": "string"
+          },
+          "finding_ref": {
+            "maxLength": 256,
+            "pattern": "^finding:[A-Za-z0-9_./:-]{1,247}$",
+            "type": "string"
+          },
+          "summary": {
+            "maxLength": 2000,
+            "minLength": 1,
+            "pattern": "^(?!.*(?:https?://|www\\.))[^\\u0000-\\u001F\\u007F\\u202A-\\u202E\\u2066-\\u2069<>`]*$",
+            "type": "string"
+          },
+          "title": {
+            "maxLength": 256,
+            "minLength": 1,
+            "pattern": "^(?!.*(?:https?://|www\\.))[^\\u0000-\\u001F\\u007F\\u202A-\\u202E\\u2066-\\u2069<>`]*$",
+            "type": "string"
+          }
+        },
+        "required": [
+          "finding_ref",
+          "title",
+          "summary",
+          "explanation",
+          "confidence",
+          "evidence_refs"
+        ],
+        "type": "object"
+      },
+      "SafeResultLimitation": {
+        "additionalProperties": false,
+        "properties": {
+          "limitation_ref": {
+            "maxLength": 256,
+            "pattern": "^limitation:[A-Za-z0-9_./:-]{1,244}$",
+            "type": "string"
+          },
+          "summary": {
+            "maxLength": 512,
+            "minLength": 1,
+            "pattern": "^(?!.*(?:https?://|www\\.))[^\\u0000-\\u001F\\u007F\\u202A-\\u202E\\u2066-\\u2069<>`]*$",
+            "type": "string"
+          }
+        },
+        "required": [
+          "limitation_ref",
+          "summary"
+        ],
+        "type": "object"
+      },
       "SignedUploadRequest": {
         "additionalProperties": false,
         "properties": {
@@ -2245,6 +2705,39 @@
         ],
         "type": "object"
       },
+      "TerminalBillingProjectionV1": {
+        "additionalProperties": false,
+        "properties": {
+          "final_credits": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CreditAmountProjectionV1"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "schema_version": {
+            "const": "run.terminal_billing_projection.v1"
+          },
+          "status": {
+            "enum": [
+              "pending",
+              "settled",
+              "released",
+              "unavailable"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "schema_version",
+          "status",
+          "final_credits"
+        ],
+        "type": "object"
+      },
       "TextRunArtifact": {
         "additionalProperties": false,
         "properties": {
@@ -2263,6 +2756,29 @@
         "required": [
           "type",
           "value"
+        ],
+        "type": "object"
+      },
+      "UnavailableCreditAmount": {
+        "additionalProperties": false,
+        "properties": {
+          "reason_code": {
+            "enum": [
+              "invalid_scale",
+              "missing_scale",
+              "unsupported_scale",
+              "legacy_unbound_scale",
+              "billing_projection_unavailable"
+            ],
+            "type": "string"
+          },
+          "status": {
+            "const": "unavailable"
+          }
+        },
+        "required": [
+          "status",
+          "reason_code"
         ],
         "type": "object"
       },
@@ -9614,6 +10130,10 @@
     {
       "description": "Production public API origin",
       "url": "https://api.zenture.app"
+    },
+    {
+      "description": "Integration public API origin",
+      "url": "https://api-int.zenture.app"
     }
   ]
 }

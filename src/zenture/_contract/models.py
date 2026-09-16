@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+import unicodedata
 from datetime import datetime
 from enum import StrEnum
 from typing import Annotated, Any, Literal, Self, cast
@@ -18,6 +19,7 @@ from zenture._contract.run_references import (
 from zenture.models import SDKBaseModel
 
 _ARTIFACT_REF_RE = re.compile(r"^art_[A-Za-z0-9_-]{3,128}$")
+_SAFE_ARTIFACT_REF_RE = re.compile(r"^[A-Za-z][A-Za-z0-9_./:-]*:[A-Za-z0-9_./:-]{1,479}$")
 _UPLOAD_ID_RE = re.compile(r"^upload_[A-Za-z0-9_-]{8,128}$")
 
 
@@ -126,6 +128,46 @@ class PublicAmountBilled(SDKBaseModel):
 
     amount: str = Field(pattern=r"^[0-9]+\.[0-9]{2}$")
     unit: Literal["credits"] = "credits"
+
+
+class AvailableCreditAmount(SDKBaseModel):
+    status: Literal["available"]
+    amount: str = Field(pattern=r"^(0|[1-9][0-9]{0,11})\.[0-9]{2}$")
+    unit: Literal["credits"]
+
+
+class UnavailableCreditAmount(SDKBaseModel):
+    status: Literal["unavailable"]
+    reason_code: Literal[
+        "invalid_scale", "missing_scale", "unsupported_scale",
+        "legacy_unbound_scale", "billing_projection_unavailable",
+    ]
+
+
+CreditAmountProjectionV1 = Annotated[
+    AvailableCreditAmount | UnavailableCreditAmount,
+    Field(discriminator="status"),
+]
+
+
+class PrepareCreditsProjectionV1(SDKBaseModel):
+    schema_version: Literal["run.prepare_credits_projection.v1"]
+    estimated_credits: CreditAmountProjectionV1
+    maximum_credits: CreditAmountProjectionV1
+
+
+class TerminalBillingProjectionV1(SDKBaseModel):
+    schema_version: Literal["run.terminal_billing_projection.v1"] = "run.terminal_billing_projection.v1"
+    status: Literal["pending", "settled", "released", "unavailable"]
+    final_credits: CreditAmountProjectionV1 | None
+
+    @model_validator(mode="after")
+    def _status_matches_amount(self) -> "TerminalBillingProjectionV1":
+        if self.status == "pending" and self.final_credits is not None:
+            raise ValueError("pending billing must not expose final Credits")
+        if self.status != "pending" and self.final_credits is None:
+            raise ValueError("terminal billing requires final Credits")
+        return self
 
 
 class PublicOperationResult(SDKBaseModel):
@@ -529,8 +571,9 @@ class PrepareKnowledgeRunResponse(SDKBaseModel):
     planned_checks: tuple[str, ...] = Field(default_factory=tuple, max_length=64)
     unavailable_checks: tuple[str, ...] = Field(default_factory=tuple, max_length=64)
     expected_duration_seconds: int = Field(ge=1, le=86_400)
-    estimated_credits: str | None = None
-    maximum_credits: str | None = None
+    estimated_credits: CreditAmountProjectionV1 | str | None = Field(default=None, description="Deprecated legacy scalar; prefer billing_projection. ")
+    maximum_credits: CreditAmountProjectionV1 | str | None = Field(default=None, description="Deprecated legacy scalar; prefer billing_projection. ")
+    billing_projection: PrepareCreditsProjectionV1 | None = None
     guest_slot_cost: int | None = Field(default=None, ge=0, le=1)
     start_admissible: bool
     proposal_hash: str = Field(pattern=r"^[a-f0-9]{64}$")
@@ -562,6 +605,150 @@ class PublicCapabilityCoverage(SDKBaseModel):
     @classmethod
     def _refs(cls, value: object) -> object:
         return _coerce_tuple(value)
+
+
+_SAFE_RESULT_FORBIDDEN = re.compile(
+    r"(?:https?://|www\.|```|`|system\s+prompt|developer\s+prompt|chain[- ]of[- ]thought|"
+    r"prompt\s+injection|api[_ -]?key|access[_ -]?token|bearer\s+|secret|password|private\s+key)",
+    re.IGNORECASE,
+)
+
+
+def _safe_result_text(value: object, *, maximum: int, field_name: str) -> str:
+    if not isinstance(value, str):
+        raise ValueError(f"{field_name} must be text")
+    normalized = " ".join(unicodedata.normalize("NFC", value).split())
+    if not normalized or len(normalized) > maximum:
+        raise ValueError(f"{field_name} bound invalid")
+    if _SAFE_RESULT_FORBIDDEN.search(normalized) or re.search(r"[\x00-\x1f\x7f\u202a-\u202e\u2066-\u2069]", normalized) or "<" in normalized or ">" in normalized:
+        raise ValueError(f"{field_name} contains unsafe content")
+    return normalized
+
+
+class SafeResultFinding(SDKBaseModel):
+    finding_ref: str = Field(max_length=256, pattern=r"^finding:[A-Za-z0-9_./:-]{1,247}$")
+    title: str = Field(min_length=1, max_length=256)
+    summary: str = Field(min_length=1, max_length=2000)
+    explanation: str = Field(min_length=1, max_length=4000)
+    confidence: Literal["low", "medium", "high"]
+    evidence_refs: tuple[str, ...] = Field(default_factory=tuple, max_length=32)
+
+    @field_validator("evidence_refs", mode="before")
+    @classmethod
+    def _refs(cls, value: object) -> object:
+        return _coerce_tuple(value)
+
+    @field_validator("title", "summary", "explanation")
+    @classmethod
+    def _safe_text(cls, value: object, info: Any) -> str:
+        return _safe_result_text(value, maximum={"title": 256, "summary": 2000, "explanation": 4000}[info.field_name], field_name=info.field_name)
+
+
+class SafeResultEvidenceSummary(SDKBaseModel):
+    evidence_ref: str = Field(max_length=256, pattern=r"^evidence:[A-Za-z0-9_./:-]{1,246}$")
+    summary: str = Field(min_length=1, max_length=1000)
+    assessment: Literal["supported", "contradicted", "uncertain"]
+    source_label: str | None = Field(default=None, max_length=256)
+
+    @field_validator("summary", "source_label")
+    @classmethod
+    def _safe_text(cls, value: object, info: Any) -> str | None:
+        if value is None:
+            return None
+        return _safe_result_text(value, maximum=1000 if info.field_name == "summary" else 256, field_name=info.field_name)
+
+
+class SafeResultLimitation(SDKBaseModel):
+    limitation_ref: str = Field(max_length=256, pattern=r"^limitation:[A-Za-z0-9_./:-]{1,244}$")
+    summary: str = Field(min_length=1, max_length=512)
+
+    @field_validator("summary")
+    @classmethod
+    def _safe_text(cls, value: object) -> str:
+        return _safe_result_text(value, maximum=512, field_name="summary")
+
+
+class SafeResultDecision(SDKBaseModel):
+    outcome: Literal["ready", "revise", "human_review", "insufficient_evidence"]
+    reason_code: str = Field(min_length=1, max_length=128, pattern=r"^[A-Za-z0-9_.-]{1,128}$")
+    next_action: str = Field(min_length=1, max_length=256)
+
+    @field_validator("next_action")
+    @classmethod
+    def _safe_action(cls, value: object) -> str:
+        return _safe_result_text(value, maximum=256, field_name="next_action")
+
+
+class SafeResultCoverageItem(SDKBaseModel):
+    check_intent_ref: str | None = Field(default=None, max_length=256, pattern=r"^check-intent:[A-Za-z0-9_./:-]{1,243}$")
+    requirement_ref: str | None = Field(default=None, max_length=256, pattern=r"^(?:review-requirement|requirement):[A-Za-z0-9_./:-]{1,237}$")
+    status: Literal["performed", "skipped_optional", "unavailable", "failed", "degraded"]
+    reason_code: str = Field(min_length=1, max_length=128, pattern=r"^[A-Za-z0-9_.-]{1,128}$")
+    blocks_ready: bool
+    artifact_refs: tuple[str, ...] = Field(default_factory=tuple, max_length=32)
+
+    @field_validator("artifact_refs", mode="before")
+    @classmethod
+    def _artifact_refs(cls, value: object) -> object:
+        values = _coerce_tuple(value)
+        if isinstance(values, tuple) and any(not isinstance(item, str) or _SAFE_ARTIFACT_REF_RE.fullmatch(item) is None for item in values):
+            raise ValueError("artifact_refs must contain compiler-safe references")
+        return values
+
+    @model_validator(mode="after")
+    def _one_subject(self) -> "SafeResultCoverageItem":
+        if (self.check_intent_ref is None) == (self.requirement_ref is None):
+            raise ValueError("coverage item must identify exactly one subject")
+        return self
+
+
+class SafeResultCoverage(SDKBaseModel):
+    coverage_ref: str = Field(max_length=256, pattern=r"^coverage:[A-Za-z0-9_./:-]{1,246}$")
+    items: tuple[SafeResultCoverageItem, ...] = Field(min_length=1, max_length=256)
+
+    @field_validator("items", mode="before")
+    @classmethod
+    def _items(cls, value: object) -> object:
+        return _coerce_tuple(value)
+
+
+class ComposedSafeResultContentV1(SDKBaseModel):
+    schema_version: Literal["run.composed_safe_result_content.v1"]
+    summary: str = Field(min_length=1, max_length=4000)
+    findings: tuple[SafeResultFinding, ...] = Field(default_factory=tuple, max_length=64)
+    evidence_summaries: tuple[SafeResultEvidenceSummary, ...] = Field(default_factory=tuple, max_length=64)
+    limitations: tuple[SafeResultLimitation, ...] = Field(default_factory=tuple, max_length=64)
+    decision: SafeResultDecision
+    coverage: SafeResultCoverage
+    decision_ref: str = Field(max_length=256, pattern=r"^decision:[A-Za-z0-9_./:-]{1,246}$")
+    coverage_ref: str = Field(max_length=256, pattern=r"^coverage:[A-Za-z0-9_./:-]{1,246}$")
+    insight_ref: str = Field(max_length=256, pattern=r"^insight:[A-Za-z0-9_./:-]{1,247}$")
+
+    @field_validator("findings", "evidence_summaries", "limitations", mode="before")
+    @classmethod
+    def _collections(cls, value: object) -> object:
+        return _coerce_tuple(value)
+
+    @field_validator("summary")
+    @classmethod
+    def _safe_summary(cls, value: object) -> str:
+        return _safe_result_text(value, maximum=4000, field_name="summary")
+
+
+class SafeResultContentAvailableV1(SDKBaseModel):
+    status: Literal["available"]
+    content: ComposedSafeResultContentV1
+
+
+class SafeResultContentUnavailableV1(SDKBaseModel):
+    status: Literal["unavailable"]
+    reason_code: Literal["legacy_result", "projection_incomplete", "result_content_unavailable"]
+
+
+SafeResultContentProjectionV1 = Annotated[
+    SafeResultContentAvailableV1 | SafeResultContentUnavailableV1,
+    Field(discriminator="status"),
+]
 
 
 class PublicQueueProjection(SDKBaseModel):
@@ -596,9 +783,11 @@ class PublicRunResponse(SDKBaseModel):
     next_action: str | None = Field(default=None, max_length=128)
     run_insight_ref: str | None = Field(default=None, max_length=256)
     artifact_refs: tuple[str, ...] = Field(default_factory=tuple, max_length=16)
-    usage_summary: dict[str, int] = Field(default_factory=dict, max_length=8)
-    billing_summary: dict[str, str] = Field(default_factory=dict, max_length=8)
+    usage_summary: dict[str, int] = Field(default_factory=dict, max_length=8, description="Deprecated additive compatibility field; use billing_projection.")
+    billing_summary: dict[str, str] = Field(default_factory=dict, max_length=8, description="Deprecated additive compatibility field; use billing_projection.")
+    billing_projection: TerminalBillingProjectionV1 | None = None
     limitations: tuple[str, ...] = Field(default_factory=tuple, max_length=32)
+    safe_result_content: SafeResultContentProjectionV1 | None = None
     cancellation_requested: bool = False
     event_cursor: str | None = Field(
         default=None, max_length=512, pattern=r"^[A-Za-z0-9._~-]{1,512}$"

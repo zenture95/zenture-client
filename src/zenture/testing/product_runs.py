@@ -16,6 +16,7 @@ from zenture._contract import (
     ListRunEventsResponse,
     PublicRunResponse,
     RunProfile,
+    RunStatus,
 )
 
 if TYPE_CHECKING:
@@ -70,6 +71,39 @@ def _require_replay_identity(replay: ListRunEventsResponse, *, run_id: str) -> N
         raise ValueError("SDK Run event replay changed the bound run_id")
 
 
+_TERMINAL_STATUSES = frozenset(
+    {
+        RunStatus.COMPLETED,
+        RunStatus.SUCCEEDED,
+        RunStatus.FAILED,
+        RunStatus.CANCELLED,
+        RunStatus.EXPIRED,
+        RunStatus.BUDGET_EXHAUSTED,
+    }
+)
+
+
+async def _cleanup_run_after_error(
+    client: AsyncZenture,
+    run_id: str,
+    *,
+    idempotency_key: str,
+) -> None:
+    """Cancel the same Run when observation fails before terminal state."""
+
+    try:
+        current = await client.runs.get(run_id)
+        if current.status not in _TERMINAL_STATUSES:
+            await client.runs.cancel(
+                run_id,
+                idempotency_key=f"{idempotency_key}-cleanup",
+            )
+    except Exception:
+        # Preserve the original observation failure; cleanup status remains
+        # visible to the owning caller through the same public Run boundary.
+        return
+
+
 async def run_product_e2e(
     client: AsyncZenture,
     fixture: ProductRunFixture,
@@ -90,19 +124,27 @@ async def run_product_e2e(
     )
     run_id = started.run_id
 
-    terminal = await client.runs.wait(
-        run_id,
-        timeout=timeout,
-        initial_interval=initial_interval,
-        max_interval=max_interval,
-    )
-    _require_same_run(terminal, run_id=run_id, stage="wait")
+    try:
+        terminal = await client.runs.wait(
+            run_id,
+            timeout=timeout,
+            initial_interval=initial_interval,
+            max_interval=max_interval,
+        )
+        _require_same_run(terminal, run_id=run_id, stage="wait")
 
-    full = await client.runs.get(run_id, view="full")
-    _require_same_run(full, run_id=run_id, stage="full")
+        full = await client.runs.get(run_id, view="full")
+        _require_same_run(full, run_id=run_id, stage="full")
 
-    event_replay = await client.runs.list_events(run_id, limit=50)
-    _require_replay_identity(event_replay, run_id=run_id)
+        event_replay = await client.runs.list_events(run_id, limit=50)
+        _require_replay_identity(event_replay, run_id=run_id)
+    except Exception:
+        await _cleanup_run_after_error(
+            client,
+            run_id,
+            idempotency_key=idempotency_key,
+        )
+        raise
 
     return ProductRunReport(
         fixture=fixture,

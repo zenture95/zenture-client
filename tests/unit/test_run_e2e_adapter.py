@@ -154,7 +154,7 @@ async def test_product_run_e2e_rejects_a_foreign_terminal_response() -> None:
     with pytest.raises(ValueError, match="changed the bound run_id"):
         await run_product_e2e(client, fixture, idempotency_key="product-e2e-fixture-answer-002")  # type: ignore[arg-type]
 
-    assert [name for name, _, _ in client.runs.calls] == ["run", "wait"]
+    assert [name for name, _, _ in client.runs.calls] == ["run", "wait", "get"]
 
 
 def test_product_run_adapter_has_no_non_sdk_transport_or_service_imports() -> None:

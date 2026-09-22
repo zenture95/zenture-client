@@ -1757,6 +1757,7 @@
             "type": "string"
           },
           "status": {
+            "description": "New settled Product Run success is completed; succeeded remains accepted for historical Run list items.",
             "type": "string"
           },
           "task_summary_ref": {
@@ -1935,6 +1936,7 @@
             ]
           },
           "status": {
+            "description": "New settled Product Run success is completed; succeeded remains accepted for historical Run responses.",
             "enum": [
               "created",
               "queued",
@@ -2145,6 +2147,7 @@
             ]
           },
           "status": {
+            "description": "New settled Product Run success is completed; succeeded remains accepted for historical Run responses.",
             "enum": [
               "created",
               "queued",
@@ -7195,6 +7198,7 @@
         "operationId": "getV1Runs",
         "parameters": [
           {
+            "description": "Comma-separated Run categories: active, completed, failed, cancelled. completed is canonical success; succeeded is a deprecated input alias for the same success category.",
             "in": "query",
             "name": "status",
             "required": false,

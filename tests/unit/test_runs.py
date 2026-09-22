@@ -58,7 +58,7 @@ def _proposal() -> dict[str, object]:
 def _run(
     *, status: str = "queued", run_id: str = RUN_ID, deadline_at: str | None = None
 ) -> dict[str, object]:
-    response = {
+    response: dict[str, object] = {
         "run_id": run_id,
         "generation": 1,
         "family": "knowledge",
@@ -73,6 +73,10 @@ def _run(
     if deadline_at is not None:
         response["deadline_at"] = deadline_at
     return response
+
+
+def _max_jitter(_lower: float, upper: float) -> float:
+    return upper
 
 
 def test_public_run_response_coerces_wire_decision_to_strict_enum() -> None:
@@ -304,11 +308,11 @@ def test_sync_run_cursor_is_rejected_before_query_or_header_forwarding(cursor: o
         api_key=API_KEY,
         http_client=httpx.Client(transport=httpx.MockTransport(handler)),
     )
-    with pytest.raises(ValueError, match="^cursor is invalid$"):
+    with pytest.raises(ValueError, match=r"^cursor is invalid$"):
         client.runs.list(cursor=cast("Any", cursor))
-    with pytest.raises(ValueError, match="^cursor is invalid$"):
+    with pytest.raises(ValueError, match=r"^cursor is invalid$"):
         client.runs.list_events(RUN_ID, cursor=cast("Any", cursor))
-    with pytest.raises(ValueError, match="^cursor is invalid$"):
+    with pytest.raises(ValueError, match=r"^cursor is invalid$"):
         list(client.runs.iter_events(RUN_ID, last_event_id=cast("Any", cursor)))
     client.close()
     assert requests == []
@@ -316,7 +320,7 @@ def test_sync_run_cursor_is_rejected_before_query_or_header_forwarding(cursor: o
 
 @pytest.mark.parametrize("cursor", [None, 1, b"cursor_bytes", [], {}, ()])
 def test_canonical_run_cursor_validator_rejects_every_non_string(cursor: object) -> None:
-    with pytest.raises(ValueError, match="^replay_cursor is invalid$"):
+    with pytest.raises(ValueError, match=r"^replay_cursor is invalid$"):
         validate_run_cursor(cursor, field="replay_cursor")
 
 
@@ -347,11 +351,11 @@ async def test_async_run_cursor_is_rejected_before_query_or_header_forwarding(
         api_key=API_KEY,
         http_client=httpx.AsyncClient(transport=httpx.MockTransport(handler)),
     )
-    with pytest.raises(ValueError, match="^cursor is invalid$"):
+    with pytest.raises(ValueError, match=r"^cursor is invalid$"):
         await client.runs.list(cursor=cast("Any", cursor))
-    with pytest.raises(ValueError, match="^cursor is invalid$"):
+    with pytest.raises(ValueError, match=r"^cursor is invalid$"):
         await client.runs.list_events(RUN_ID, cursor=cast("Any", cursor))
-    with pytest.raises(ValueError, match="^cursor is invalid$"):
+    with pytest.raises(ValueError, match=r"^cursor is invalid$"):
         _ = [
             message
             async for message in client.runs.iter_events(
@@ -545,7 +549,7 @@ def test_sync_iter_events_rejects_invalid_wait_parameters(
             transport=httpx.MockTransport(lambda _request: _stream_response(b""))
         ),
     )
-    with pytest.raises(ValueError, match="finite|greater"):
+    with pytest.raises(ValueError, match=r"finite|greater"):
         list(
             client.runs.iter_events(
                 RUN_ID,
@@ -577,7 +581,7 @@ async def test_async_iter_events_rejects_invalid_wait_parameters(
         api_key=API_KEY,
         http_client=httpx.AsyncClient(transport=httpx.MockTransport(handler)),
     )
-    with pytest.raises(ValueError, match="finite|greater"):
+    with pytest.raises(ValueError, match=r"finite|greater"):
         [
             message
             async for message in client.runs.iter_events(
@@ -608,7 +612,7 @@ def test_sync_iter_events_applies_bounded_reconnect_jitter(
     monkeypatch.setattr(
         runs_module,
         "random",
-        SimpleNamespace(uniform=lambda _lower, upper: upper),
+        SimpleNamespace(uniform=_max_jitter),
         raising=False,
     )
 
@@ -658,7 +662,7 @@ async def test_async_iter_events_applies_bounded_reconnect_jitter(
     monkeypatch.setattr(
         runs_module,
         "random",
-        SimpleNamespace(uniform=lambda _lower, upper: upper),
+        SimpleNamespace(uniform=_max_jitter),
         raising=False,
     )
 
@@ -1363,10 +1367,20 @@ def test_sync_wait_does_not_extend_for_a_deadline_already_past(
 
     now = 1_000.0
     calls = 0
+
+    def monotonic() -> float:
+        return now
+
+    def wall_time() -> float:
+        return now
+
+    def sleep(_seconds: float) -> None:
+        return None
+
     monkeypatch.setattr(
         runs_module,
         "time",
-        SimpleNamespace(monotonic=lambda: now, time=lambda: now, sleep=lambda _seconds: None),
+        SimpleNamespace(monotonic=monotonic, time=wall_time, sleep=sleep),
     )
 
     def handler(_request: httpx.Request) -> httpx.Response:

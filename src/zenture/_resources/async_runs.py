@@ -31,16 +31,16 @@ from zenture._resources.runs import (
     ARTIFACT_CHUNK_SIZE,
     MAX_STREAM_EVENT_BYTES,
     RunEventStreamState,
-    _async_stream_timeout,
-    _deadline_bound,
-    _polling_timeout,
     add_wait_header,
+    async_stream_timeout,
     bounded_stream_retry_delay,
+    deadline_bound,
     is_retryable_stream_error,
     is_terminal_status,
     is_terminal_stream_message,
     parse_run_response,
     phase_key,
+    polling_timeout,
     required_artifact_size,
     run_list_params,
     validate_run_event_replay,
@@ -293,7 +293,7 @@ class AsyncRunsResource:
                 headers["Last-Event-ID"] = state.cursor
             progressed = False
             try:
-                stream_timeout = _async_stream_timeout(run_id=run_id, deadline=deadline, stop=stop)
+                stream_timeout = async_stream_timeout(run_id=run_id, deadline=deadline, stop=stop)
                 async with asyncio.timeout(stream_timeout):
                     async with self._transport.stream(
                         "GET",
@@ -357,20 +357,20 @@ class AsyncRunsResource:
         )
         deadline = time.monotonic() + (timeout if timeout is not None else 120.0)
         interval = initial_interval
-        observed_deadline: object | None = None
+        observed_deadline: datetime | None = None
         last_status = None
         while True:
             if callable(stop) and stop():
                 raise ZenturePollingStoppedError(operation_id=run_id)
             if time.monotonic() >= deadline:
-                raise _polling_timeout(
+                raise polling_timeout(
                     run_id=run_id,
                     last_status=last_status,
                     observed_deadline=observed_deadline,
                 )
             result = await self.get(run_id, _timeout=max(0.0, deadline - time.monotonic()))
             if time.monotonic() >= deadline:
-                raise _polling_timeout(
+                raise polling_timeout(
                     run_id=run_id,
                     last_status=result.status,
                     observed_deadline=observed_deadline,
@@ -389,7 +389,7 @@ class AsyncRunsResource:
             if observed_deadline is None and result.deadline_at is not None:
                 observed_deadline = result.deadline_at
                 if timeout is None:
-                    deadline = _deadline_bound(
+                    deadline = deadline_bound(
                         observed_deadline,
                         now_monotonic=time.monotonic(),
                         now_wall=time.time(),

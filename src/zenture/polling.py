@@ -87,14 +87,18 @@ def validate_wait_parameters(
 ) -> None:
     """Validate one finite wait budget and its polling intervals."""
 
-    values = {
+    values: dict[str, object] = {
         "initial_interval": initial_interval,
         "max_interval": max_interval,
     }
     if timeout is not None:
         values["timeout"] = timeout
     for name, value in values.items():
-        if isinstance(value, bool) or not isinstance(value, int | float) or not math.isfinite(value):
+        if (
+            isinstance(value, bool)
+            or not isinstance(value, int | float)
+            or not math.isfinite(value)
+        ):
             raise ValueError(f"{name} must be finite")
     if timeout is not None and timeout <= 0:
         raise ValueError("timeout must be positive")

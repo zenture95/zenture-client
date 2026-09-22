@@ -106,22 +106,18 @@ def parse_run_response(payload: object, *, expected_run_id: str) -> PublicRunRes
     return response
 
 
-def _deadline_bound(
-    deadline_at: object, *, now_monotonic: float, now_wall: float, max_interval: float
+def deadline_bound(
+    deadline_at: datetime, *, now_monotonic: float, now_wall: float, max_interval: float
 ) -> float:
-    timestamp = cast("datetime", deadline_at).timestamp()
+    timestamp = deadline_at.timestamp()
     return now_monotonic + timestamp - now_wall + _RUN_RECOVERY_BOUND_SECONDS + max_interval
 
 
-def _polling_timeout(
-    *, run_id: str, last_status: RunStatus | None, observed_deadline: object | None
+def polling_timeout(
+    *, run_id: str, last_status: RunStatus | None, observed_deadline: datetime | None
 ) -> ZenturePollingTimeoutError:
     status = last_status.value if last_status is not None else None
-    deadline = (
-        observed_deadline.isoformat()
-        if observed_deadline is not None and hasattr(observed_deadline, "isoformat")
-        else None
-    )
+    deadline = observed_deadline.isoformat() if observed_deadline is not None else None
     details: list[str] = []
     if status is not None:
         details.append(f"last_status={status}")
@@ -285,7 +281,7 @@ def _sync_stream_timeout(
     return min(remaining, _SYNC_STREAM_STOP_POLL_INTERVAL)
 
 
-def _async_stream_timeout(
+def async_stream_timeout(
     *, run_id: str, deadline: float | None, stop: Callable[[], bool] | None
 ) -> float | None:
     """Bound async reads while a local stop callback needs polling."""
@@ -617,20 +613,20 @@ class RunsResource:
         )
         deadline = time.monotonic() + (timeout if timeout is not None else _DEFAULT_WAIT_TIMEOUT)
         interval = initial_interval
-        observed_deadline: object | None = None
+        observed_deadline: datetime | None = None
         last_status: RunStatus | None = None
         while True:
             if callable(stop) and stop():
                 raise ZenturePollingStoppedError(operation_id=run_id)
             if time.monotonic() >= deadline:
-                raise _polling_timeout(
+                raise polling_timeout(
                     run_id=run_id,
                     last_status=last_status,
                     observed_deadline=observed_deadline,
                 )
             result = self.get(run_id, _timeout=max(0.0, deadline - time.monotonic()))
             if time.monotonic() >= deadline:
-                raise _polling_timeout(
+                raise polling_timeout(
                     run_id=run_id,
                     last_status=result.status,
                     observed_deadline=observed_deadline,
@@ -649,7 +645,7 @@ class RunsResource:
             if observed_deadline is None and result.deadline_at is not None:
                 observed_deadline = result.deadline_at
                 if timeout is None:
-                    deadline = _deadline_bound(
+                    deadline = deadline_bound(
                         observed_deadline,
                         now_monotonic=time.monotonic(),
                         now_wall=time.time(),

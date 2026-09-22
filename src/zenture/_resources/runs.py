@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import random
 import re
 import time
 from collections import OrderedDict
@@ -79,6 +80,7 @@ ARTIFACT_CHUNK_SIZE = 64 * 1024
 _RUN_ID_RE = re.compile(r"^run_[A-Za-z0-9_-]{3,128}$")
 _DEFAULT_WAIT_TIMEOUT = 120.0
 _RUN_RECOVERY_BOUND_SECONDS = 35.0
+_STREAM_RECONNECT_JITTER_RATIO = 0.25
 
 
 def is_terminal_status(status: RunStatus) -> bool:
@@ -227,6 +229,23 @@ def is_retryable_stream_error(error: Exception) -> bool:
             or error.error_code in _RETRYABLE_STREAM_ERROR_CODES
         )
     return False
+
+
+def bounded_stream_retry_delay(
+    *, interval: float, max_interval: float, remaining: float | None = None
+) -> float:
+    """Add bounded reconnect jitter without exceeding the active wait budget."""
+
+    if interval <= 0.0:
+        return 0.0
+    jitter_limit = min(
+        interval * _STREAM_RECONNECT_JITTER_RATIO,
+        max(0.0, max_interval - interval),
+    )
+    delay = interval + random.uniform(0.0, jitter_limit)
+    if remaining is not None:
+        delay = min(delay, max(0.0, remaining))
+    return delay
 
 
 def _raise_if_stream_stopped(
@@ -557,9 +576,12 @@ class RunsResource:
 
             _raise_if_stream_stopped(run_id=run_id, deadline=deadline, stop=stop)
             state.finish_stream(progressed=progressed, checkpoint=checkpoint)
-            delay = state.reconnect_interval
-            if deadline is not None:
-                delay = min(delay, max(0.0, deadline - time.monotonic()))
+            remaining = None if deadline is None else max(0.0, deadline - time.monotonic())
+            delay = bounded_stream_retry_delay(
+                interval=state.reconnect_interval,
+                max_interval=max(state.max_interval, _MIN_STREAM_CHECKPOINT_BACKOFF),
+                remaining=remaining,
+            )
             if delay > 0:
                 time.sleep(delay)
 

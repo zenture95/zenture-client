@@ -34,6 +34,7 @@ from zenture._resources.runs import (
     _deadline_bound,
     _polling_timeout,
     add_wait_header,
+    bounded_stream_retry_delay,
     is_retryable_stream_error,
     is_terminal_status,
     is_terminal_stream_message,
@@ -330,9 +331,12 @@ class AsyncRunsResource:
             if deadline is not None and time.monotonic() >= deadline:
                 raise ZenturePollingTimeoutError(operation_id=run_id)
             state.finish_stream(progressed=progressed)
-            delay = state.reconnect_interval
-            if deadline is not None:
-                delay = min(delay, max(0.0, deadline - time.monotonic()))
+            remaining = None if deadline is None else max(0.0, deadline - time.monotonic())
+            delay = bounded_stream_retry_delay(
+                interval=state.reconnect_interval,
+                max_interval=max(state.max_interval, 0.01),
+                remaining=remaining,
+            )
             if delay > 0:
                 await asyncio.sleep(delay)
 

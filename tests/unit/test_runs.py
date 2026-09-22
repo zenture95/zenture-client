@@ -1424,7 +1424,7 @@ async def test_async_wait_uses_finite_default_for_null_deadline(
         "time",
         SimpleNamespace(monotonic=lambda: now, time=lambda: 1_000.0),
     )
-    monkeypatch.setattr(async_runs_module.asyncio, "sleep", sleep)
+    monkeypatch.setattr(asyncio, "sleep", sleep)
 
     async def handler(_request: httpx.Request) -> httpx.Response:
         nonlocal calls

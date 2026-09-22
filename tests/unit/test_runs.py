@@ -1405,8 +1405,26 @@ def test_sync_wait_rejects_a_changed_server_deadline() -> None:
 
 
 @pytest.mark.asyncio
-async def test_async_wait_uses_finite_default_for_null_deadline() -> None:
+async def test_async_wait_uses_finite_default_for_null_deadline(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import zenture._resources.async_runs as async_runs_module
+
+    now = 1_000.0
+    sleeps: list[float] = []
     calls = 0
+
+    async def sleep(seconds: float) -> None:
+        nonlocal now
+        sleeps.append(seconds)
+        now += seconds
+
+    monkeypatch.setattr(
+        async_runs_module,
+        "time",
+        SimpleNamespace(monotonic=lambda: now, time=lambda: 1_000.0),
+    )
+    monkeypatch.setattr(async_runs_module.asyncio, "sleep", sleep)
 
     async def handler(_request: httpx.Request) -> httpx.Response:
         nonlocal calls
@@ -1418,10 +1436,12 @@ async def test_async_wait_uses_finite_default_for_null_deadline() -> None:
         http_client=httpx.AsyncClient(transport=httpx.MockTransport(handler)),
     )
     with pytest.raises(ZenturePollingTimeoutError) as exc_info:
-        await client.runs.wait(RUN_ID, timeout=0.001, initial_interval=0.01, max_interval=0.01)
+        await client.runs.wait(RUN_ID, initial_interval=60.0, max_interval=60.0)
 
-    assert calls == 1
+    assert calls == 2
+    assert sleeps == [60.0, 60.0]
     assert exc_info.value.last_status == "queued"
+    assert exc_info.value.observed_deadline is None
     await client.aclose()
 
 
@@ -1513,11 +1533,13 @@ async def test_async_wait_uses_the_first_non_null_deadline_once(
         api_key=API_KEY,
         http_client=httpx.AsyncClient(transport=httpx.MockTransport(handler)),
     )
-    with pytest.raises(ZenturePollingTimeoutError):
+    with pytest.raises(ZenturePollingTimeoutError) as exc_info:
         await client.runs.wait(RUN_ID, initial_interval=20.0, max_interval=20.0)
 
     assert calls == 2
     assert sleeps == [20.0, 16.0]
+    assert exc_info.value.last_status == "queued"
+    assert exc_info.value.observed_deadline == "1970-01-01T00:16:21+00:00"
     await client.aclose()
 
 

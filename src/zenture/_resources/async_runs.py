@@ -31,6 +31,7 @@ from zenture._resources.runs import (
     ARTIFACT_CHUNK_SIZE,
     MAX_STREAM_EVENT_BYTES,
     RunEventStreamState,
+    _async_stream_timeout,
     _deadline_bound,
     _polling_timeout,
     add_wait_header,
@@ -40,7 +41,6 @@ from zenture._resources.runs import (
     is_terminal_stream_message,
     parse_run_response,
     phase_key,
-    remaining_stream_timeout,
     required_artifact_size,
     run_list_params,
     validate_run_event_replay,
@@ -273,8 +273,9 @@ class AsyncRunsResource:
         stop: Callable[[], bool] | None = None,
     ) -> AsyncIterator[PublicRunStreamMessage]:
         validate_run_id(run_id)
-        if timeout is not None and timeout <= 0:
-            raise ValueError("timeout must be positive")
+        validate_wait_parameters(
+            timeout=timeout, initial_interval=initial_interval, max_interval=max_interval
+        )
         deadline = time.monotonic() + timeout if timeout is not None else None
         state = RunEventStreamState(
             cursor=last_event_id,
@@ -292,7 +293,7 @@ class AsyncRunsResource:
                 headers["Last-Event-ID"] = state.cursor
             progressed = False
             try:
-                stream_timeout = remaining_stream_timeout(run_id=run_id, deadline=deadline)
+                stream_timeout = _async_stream_timeout(run_id=run_id, deadline=deadline, stop=stop)
                 async with asyncio.timeout(stream_timeout):
                     async with self._transport.stream(
                         "GET",
@@ -319,9 +320,12 @@ class AsyncRunsResource:
                                     break
                                 return
             except TimeoutError as exc:
-                if deadline is None:
+                if deadline is None and callable(stop):
+                    pass
+                elif deadline is None:
                     raise
-                raise ZenturePollingTimeoutError(operation_id=run_id) from exc
+                else:
+                    raise ZenturePollingTimeoutError(operation_id=run_id) from exc
             except (ZentureAPIError, ZentureTransportError) as exc:
                 if not is_retryable_stream_error(exc):
                     raise

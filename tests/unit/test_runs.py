@@ -527,6 +527,69 @@ async def test_async_iter_events_reconnects_after_retryable_transport_error() ->
     await client.aclose()
 
 
+@pytest.mark.parametrize(
+    ("timeout", "initial_interval", "max_interval"),
+    [
+        (float("nan"), 1.0, 8.0),
+        (None, float("inf"), 8.0),
+        (None, 2.0, 1.0),
+        (None, 1.0, float("nan")),
+    ],
+)
+def test_sync_iter_events_rejects_invalid_wait_parameters(
+    timeout: float | None, initial_interval: float, max_interval: float
+) -> None:
+    client = Zenture(
+        api_key=API_KEY,
+        http_client=httpx.Client(
+            transport=httpx.MockTransport(lambda _request: _stream_response(b""))
+        ),
+    )
+    with pytest.raises(ValueError, match="finite|greater"):
+        list(
+            client.runs.iter_events(
+                RUN_ID,
+                timeout=timeout,
+                initial_interval=initial_interval,
+                max_interval=max_interval,
+            )
+        )
+    client.close()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("timeout", "initial_interval", "max_interval"),
+    [
+        (float("nan"), 1.0, 8.0),
+        (None, float("inf"), 8.0),
+        (None, 2.0, 1.0),
+        (None, 1.0, float("nan")),
+    ],
+)
+async def test_async_iter_events_rejects_invalid_wait_parameters(
+    timeout: float | None, initial_interval: float, max_interval: float
+) -> None:
+    async def handler(_request: httpx.Request) -> httpx.Response:
+        return _stream_response(b"")
+
+    client = AsyncZenture(
+        api_key=API_KEY,
+        http_client=httpx.AsyncClient(transport=httpx.MockTransport(handler)),
+    )
+    with pytest.raises(ValueError, match="finite|greater"):
+        [
+            message
+            async for message in client.runs.iter_events(
+                RUN_ID,
+                timeout=timeout,
+                initial_interval=initial_interval,
+                max_interval=max_interval,
+            )
+        ]
+    await client.aclose()
+
+
 def test_sync_iter_events_applies_bounded_reconnect_jitter(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -619,9 +682,7 @@ async def test_async_iter_events_applies_bounded_reconnect_jitter(
     )
     messages = [
         message
-        async for message in client.runs.iter_events(
-            RUN_ID, initial_interval=1.0, max_interval=8.0
-        )
+        async for message in client.runs.iter_events(RUN_ID, initial_interval=1.0, max_interval=8.0)
     ]
 
     assert [message.event_id for message in messages] == ["event_jitter_async"]
@@ -1233,7 +1294,9 @@ def test_sync_wait_uses_first_server_deadline_once_and_reports_context_on_timeou
         sleeps.append(seconds)
         now += seconds
 
-    monkeypatch.setattr(runs_module, "time", SimpleNamespace(monotonic=monotonic, sleep=sleep, time=lambda: 1_000.0))
+    monkeypatch.setattr(
+        runs_module, "time", SimpleNamespace(monotonic=monotonic, sleep=sleep, time=lambda: 1_000.0)
+    )
 
     def handler(_request: httpx.Request) -> httpx.Response:
         nonlocal calls
@@ -2145,6 +2208,42 @@ async def test_async_iter_events_checks_timeout_after_heartbeat(
     with pytest.raises(ZenturePollingTimeoutError):
         [message async for message in client.runs.iter_events(RUN_ID, timeout=1.0)]
 
+    assert streams[0].closed
+    await client.aclose()
+
+
+@pytest.mark.asyncio
+async def test_async_iter_events_polls_stop_during_an_idle_stream() -> None:
+    streams: list[_IdleAsyncStream] = []
+    stop_calls = 0
+
+    async def handler(_request: httpx.Request) -> httpx.Response:
+        stream = _IdleAsyncStream()
+        streams.append(stream)
+        return httpx.Response(
+            200,
+            headers={"content-type": "text/event-stream"},
+            stream=stream,
+        )
+
+    def stop() -> bool:
+        nonlocal stop_calls
+        stop_calls += 1
+        return stop_calls > 1
+
+    client = AsyncZenture(
+        api_key=API_KEY,
+        http_client=httpx.AsyncClient(transport=httpx.MockTransport(handler)),
+    )
+    with pytest.raises(ZenturePollingStoppedError):
+        [
+            message
+            async for message in client.runs.iter_events(
+                RUN_ID, stop=stop, initial_interval=0.0, max_interval=0.0
+            )
+        ]
+
+    assert stop_calls >= 2
     assert streams[0].closed
     await client.aclose()
 

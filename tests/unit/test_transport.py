@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import asyncio
+from types import SimpleNamespace
 from typing import TYPE_CHECKING, cast
 
 import httpx
@@ -231,6 +233,103 @@ def test_sync_transport_retries_transient_network_error_for_idempotent_mutation(
         headers={"Idempotency-Key": "retry-network-123"},
     ) == {"ok": True}
     assert attempts == 2
+
+
+def test_sync_transport_retries_within_request_deadline_and_caps_attempt_budget(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import zenture._transport.sync as sync_transport_module
+
+    now = 0.0
+    sleeps: list[float] = []
+    read_timeouts: list[float] = []
+    attempts = 0
+
+    def sleep(seconds: float) -> None:
+        nonlocal now
+        sleeps.append(seconds)
+        now += seconds
+
+    monkeypatch.setattr(
+        sync_transport_module,
+        "time",
+        SimpleNamespace(monotonic=lambda: now, sleep=sleep),
+    )
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        nonlocal attempts
+        attempts += 1
+        read_timeouts.append(request.extensions["timeout"]["read"])
+        if attempts == 1:
+            return httpx.Response(
+                503,
+                json={
+                    "error": {"code": "dependency_unavailable", "message": "temporary"},
+                    "request_id": "req_00000000000000000000000000000000",
+                },
+            )
+        return httpx.Response(200, json={"ok": True})
+
+    transport = SyncTransport(
+        config=ZentureConfig(
+            api_key=LIVE_TRANSPORT_KEY,
+            initial_retry_backoff=2.0,
+            max_retry_backoff=8.0,
+        ),
+        client=httpx.Client(transport=httpx.MockTransport(handler)),
+    )
+
+    assert transport.request_json("GET", "/usage", timeout=5.0) == {"ok": True}
+    assert attempts == 2
+    assert sleeps == [2.0]
+    assert read_timeouts == [5.0, 3.0]
+
+
+def test_sync_transport_expiry_during_retry_preserves_deadline_error(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import zenture._transport.sync as sync_transport_module
+
+    now = 0.0
+    sleeps: list[float] = []
+    attempts = 0
+
+    def sleep(seconds: float) -> None:
+        nonlocal now
+        sleeps.append(seconds)
+        now += seconds
+
+    monkeypatch.setattr(
+        sync_transport_module,
+        "time",
+        SimpleNamespace(monotonic=lambda: now, sleep=sleep),
+    )
+
+    def handler(_request: httpx.Request) -> httpx.Response:
+        nonlocal attempts
+        attempts += 1
+        return httpx.Response(
+            503,
+            json={
+                "error": {"code": "dependency_unavailable", "message": "temporary"},
+                "request_id": "req_00000000000000000000000000000000",
+            },
+        )
+
+    transport = SyncTransport(
+        config=ZentureConfig(
+            api_key=LIVE_TRANSPORT_KEY,
+            initial_retry_backoff=2.0,
+            max_retry_backoff=8.0,
+        ),
+        client=httpx.Client(transport=httpx.MockTransport(handler)),
+    )
+
+    with pytest.raises(ZentureTransportError, match="request deadline exceeded"):
+        transport.request_json("GET", "/usage", timeout=0.5)
+
+    assert attempts == 1
+    assert sleeps == [0.5]
 
 
 def test_sync_transport_does_not_retry_mutation_without_idempotency_key() -> None:
@@ -683,6 +782,107 @@ async def test_async_transport_retries_transient_network_error_for_idempotent_mu
         headers={"Idempotency-Key": "retry-network-123"},
     ) == {"ok": True}
     assert attempts == 2
+
+
+@pytest.mark.asyncio
+async def test_async_transport_retries_within_request_deadline_and_caps_attempt_budget(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import zenture._transport.async_ as async_transport_module
+
+    now = 0.0
+    sleeps: list[float] = []
+    read_timeouts: list[float] = []
+    attempts = 0
+
+    async def sleep(seconds: float) -> None:
+        nonlocal now
+        sleeps.append(seconds)
+        now += seconds
+
+    monkeypatch.setattr(
+        async_transport_module,
+        "time",
+        SimpleNamespace(monotonic=lambda: now),
+    )
+    monkeypatch.setattr(asyncio, "sleep", sleep)
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        nonlocal attempts
+        attempts += 1
+        read_timeouts.append(request.extensions["timeout"]["read"])
+        if attempts == 1:
+            return httpx.Response(
+                503,
+                json={
+                    "error": {"code": "dependency_unavailable", "message": "temporary"},
+                    "request_id": "req_00000000000000000000000000000000",
+                },
+            )
+        return httpx.Response(200, json={"ok": True})
+
+    transport = AsyncTransport(
+        config=ZentureConfig(
+            api_key=LIVE_TRANSPORT_KEY,
+            initial_retry_backoff=2.0,
+            max_retry_backoff=8.0,
+        ),
+        client=httpx.AsyncClient(transport=httpx.MockTransport(handler)),
+    )
+
+    assert await transport.request_json("GET", "/usage", timeout=5.0) == {"ok": True}
+    assert attempts == 2
+    assert sleeps == [2.0]
+    assert read_timeouts == [5.0, 3.0]
+
+
+@pytest.mark.asyncio
+async def test_async_transport_expiry_during_retry_preserves_deadline_error(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import zenture._transport.async_ as async_transport_module
+
+    now = 0.0
+    sleeps: list[float] = []
+    attempts = 0
+
+    async def sleep(seconds: float) -> None:
+        nonlocal now
+        sleeps.append(seconds)
+        now += seconds
+
+    monkeypatch.setattr(
+        async_transport_module,
+        "time",
+        SimpleNamespace(monotonic=lambda: now),
+    )
+    monkeypatch.setattr(asyncio, "sleep", sleep)
+
+    async def handler(_request: httpx.Request) -> httpx.Response:
+        nonlocal attempts
+        attempts += 1
+        return httpx.Response(
+            503,
+            json={
+                "error": {"code": "dependency_unavailable", "message": "temporary"},
+                "request_id": "req_00000000000000000000000000000000",
+            },
+        )
+
+    transport = AsyncTransport(
+        config=ZentureConfig(
+            api_key=LIVE_TRANSPORT_KEY,
+            initial_retry_backoff=2.0,
+            max_retry_backoff=8.0,
+        ),
+        client=httpx.AsyncClient(transport=httpx.MockTransport(handler)),
+    )
+
+    with pytest.raises(ZentureTransportError, match="request deadline exceeded"):
+        await transport.request_json("GET", "/usage", timeout=0.5)
+
+    assert attempts == 1
+    assert sleeps == [0.5]
 
 
 @pytest.mark.asyncio

@@ -73,6 +73,8 @@ _MAX_STREAM_CURSOR_CYCLES = 3
 _MAX_SEEN_EVENT_IDS = 1_024
 _SYNC_STREAM_STOP_POLL_INTERVAL = 0.25
 _SYNC_STREAM_HEARTBEAT_INTERVAL = 15.0
+_ASYNC_STREAM_STOP_POLL_INTERVAL = 0.25
+_ASYNC_STREAM_HEARTBEAT_INTERVAL = 15.0
 _MIN_STREAM_CHECKPOINT_BACKOFF = 0.01
 _MAX_ARTIFACT_BYTES = 10 * 1024 * 1024
 MAX_STREAM_EVENT_BYTES = 512 * 1024
@@ -281,6 +283,20 @@ def _sync_stream_timeout(
     if not callable(stop):
         return min(remaining, _SYNC_STREAM_HEARTBEAT_INTERVAL)
     return min(remaining, _SYNC_STREAM_STOP_POLL_INTERVAL)
+
+
+def _async_stream_timeout(
+    *, run_id: str, deadline: float | None, stop: Callable[[], bool] | None
+) -> float | None:
+    """Bound async reads while a local stop callback needs polling."""
+
+    if deadline is None:
+        return _ASYNC_STREAM_STOP_POLL_INTERVAL if callable(stop) else None
+    remaining = remaining_stream_timeout(run_id=run_id, deadline=deadline)
+    assert remaining is not None
+    if not callable(stop):
+        return min(remaining, _ASYNC_STREAM_HEARTBEAT_INTERVAL)
+    return min(remaining, _ASYNC_STREAM_STOP_POLL_INTERVAL)
 
 
 def _sync_stream_needs_final_window_reconfigure(
@@ -520,8 +536,9 @@ class RunsResource:
         stop: Callable[[], bool] | None = None,
     ) -> Iterator[PublicRunStreamMessage]:
         validate_run_id(run_id)
-        if timeout is not None and timeout <= 0:
-            raise ValueError("timeout must be positive")
+        validate_wait_parameters(
+            timeout=timeout, initial_interval=initial_interval, max_interval=max_interval
+        )
         deadline = time.monotonic() + timeout if timeout is not None else None
         state = RunEventStreamState(
             cursor=last_event_id,
@@ -598,9 +615,7 @@ class RunsResource:
         validate_wait_parameters(
             timeout=timeout, initial_interval=initial_interval, max_interval=max_interval
         )
-        deadline = time.monotonic() + (
-            timeout if timeout is not None else _DEFAULT_WAIT_TIMEOUT
-        )
+        deadline = time.monotonic() + (timeout if timeout is not None else _DEFAULT_WAIT_TIMEOUT)
         interval = initial_interval
         observed_deadline: object | None = None
         last_status: RunStatus | None = None
@@ -628,7 +643,9 @@ class RunsResource:
                 and result.deadline_at is not None
                 and result.deadline_at != observed_deadline
             ):
-                raise ZentureResponseError("Public API response deadline_at changed during Run polling.")
+                raise ZentureResponseError(
+                    "Public API response deadline_at changed during Run polling."
+                )
             if observed_deadline is None and result.deadline_at is not None:
                 observed_deadline = result.deadline_at
                 if timeout is None:

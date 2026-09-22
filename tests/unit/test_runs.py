@@ -87,6 +87,41 @@ def test_public_run_response_coerces_wire_decision_to_strict_enum() -> None:
     assert response.acceptance_decision.value == "ready"
 
 
+@pytest.mark.parametrize("status", ["completed", "succeeded"])
+def test_sync_run_list_forwards_success_filter_and_reads_success_status(status: str) -> None:
+    requests: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        requests.append(request)
+        return httpx.Response(
+            200,
+            json={
+                "runs": [
+                    {
+                        "run_id": RUN_ID,
+                        "status": status,
+                        "profile": "standard",
+                        "created_at": "2026-08-30T12:00:00Z",
+                        "updated_at": "2026-08-30T12:00:00Z",
+                    }
+                ],
+                "has_more": False,
+                "next_cursor": None,
+            },
+        )
+
+    client = Zenture(
+        api_key=API_KEY,
+        http_client=httpx.Client(transport=httpx.MockTransport(handler)),
+    )
+    result = client.runs.list(status=[status])
+
+    assert requests[0].url.path == "/v1/runs"
+    assert requests[0].url.params["status"] == status
+    assert result.runs[0].status.value == status
+    client.close()
+
+
 def _sse_event(*, event_id: str, sequence: int, status: str, event_cursor: str) -> bytes:
     payload = {
         "type": "run.event",

@@ -397,6 +397,11 @@ stopped, the exception exposes `operation_id` and `idempotency_key` attributes.
 Use `client.operations.get(exc.operation_id)` or retry with the same
 `exc.idempotency_key`. Do not retry a billable mutation with a new key.
 
+For a successful settled Product Run, the canonical status is `completed`.
+`client.runs.list(status=["completed"])` selects that success category;
+`succeeded` remains a deprecated list-filter input and a historical Run response
+value. Async Operations still use `succeeded` for terminal success.
+
 For public Runs, `client.runs.wait(run_id)` is always finite. When the first
 response includes `deadline_at`, an omitted timeout ends at that deadline plus
 the fixed 35-second recovery allowance and one polling interval. A caller

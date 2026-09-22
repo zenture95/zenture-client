@@ -320,12 +320,10 @@ class AsyncRunsResource:
                                     break
                                 return
             except TimeoutError as exc:
-                if deadline is None and callable(stop):
-                    pass
-                elif deadline is None:
-                    raise
-                else:
+                if deadline is not None and time.monotonic() >= deadline:
                     raise ZenturePollingTimeoutError(operation_id=run_id) from exc
+                if deadline is None and not callable(stop):
+                    raise
             except (ZentureAPIError, ZentureTransportError) as exc:
                 if not is_retryable_stream_error(exc):
                     raise

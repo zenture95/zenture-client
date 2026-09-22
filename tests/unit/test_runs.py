@@ -2079,6 +2079,23 @@ class _IdleAsyncStream(httpx.AsyncByteStream):
         self.closed = True
 
 
+class _ImmediateAsyncStream(httpx.AsyncByteStream):
+    async def __aiter__(self) -> AsyncIterator[bytes]:
+        if False:
+            yield b""
+
+    async def aclose(self) -> None:
+        return None
+
+
+class _ExpiringAsyncTimeout:
+    async def __aenter__(self) -> _ExpiringAsyncTimeout:
+        return self
+
+    async def __aexit__(self, *_exc_info: object) -> None:
+        raise TimeoutError("test read window expired")
+
+
 def test_sync_iter_events_stops_before_reading_idle_stream() -> None:
     requests: list[httpx.Request] = []
     streams: list[_StopAwareSyncStream] = []
@@ -2245,6 +2262,95 @@ async def test_async_iter_events_polls_stop_during_an_idle_stream() -> None:
 
     assert stop_calls >= 2
     assert streams[0].closed
+    await client.aclose()
+
+
+@pytest.mark.asyncio
+async def test_async_iter_events_rechecks_absolute_deadline_after_idle_window(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import zenture._resources.async_runs as async_runs_module
+    import zenture._resources.runs as runs_module
+
+    clock_values = iter((0.0, 0.0, 0.0, 15.0, 15.0, 30.0))
+    fake_time = SimpleNamespace(monotonic=lambda: next(clock_values, 30.0))
+    monkeypatch.setattr(async_runs_module, "time", fake_time)
+    monkeypatch.setattr(runs_module, "time", fake_time)
+    windows: list[float | None] = []
+
+    def timeout(seconds: float | None) -> _ExpiringAsyncTimeout:
+        windows.append(seconds)
+        return _ExpiringAsyncTimeout()
+
+    monkeypatch.setattr(asyncio, "timeout", timeout)
+    requests = 0
+
+    async def handler(_request: httpx.Request) -> httpx.Response:
+        nonlocal requests
+        requests += 1
+        return httpx.Response(
+            200,
+            headers={"content-type": "text/event-stream"},
+            stream=_ImmediateAsyncStream(),
+        )
+
+    client = AsyncZenture(
+        api_key=API_KEY,
+        http_client=httpx.AsyncClient(transport=httpx.MockTransport(handler)),
+    )
+    with pytest.raises(ZenturePollingTimeoutError):
+        [message async for message in client.runs.iter_events(RUN_ID, timeout=30.0)]
+
+    assert requests == 1
+    assert windows == [15.0]
+    await client.aclose()
+
+
+@pytest.mark.asyncio
+async def test_async_iter_events_rechecks_stop_after_explicit_deadline_idle_window(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import zenture._resources.async_runs as async_runs_module
+    import zenture._resources.runs as runs_module
+
+    fake_time = SimpleNamespace(monotonic=lambda: 0.0)
+    monkeypatch.setattr(async_runs_module, "time", fake_time)
+    monkeypatch.setattr(runs_module, "time", fake_time)
+    windows: list[float | None] = []
+
+    def timeout(seconds: float | None) -> _ExpiringAsyncTimeout:
+        windows.append(seconds)
+        return _ExpiringAsyncTimeout()
+
+    monkeypatch.setattr(asyncio, "timeout", timeout)
+    stop_calls = 0
+
+    async def handler(_request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            200,
+            headers={"content-type": "text/event-stream"},
+            stream=_ImmediateAsyncStream(),
+        )
+
+    def stop() -> bool:
+        nonlocal stop_calls
+        stop_calls += 1
+        return stop_calls > 1
+
+    client = AsyncZenture(
+        api_key=API_KEY,
+        http_client=httpx.AsyncClient(transport=httpx.MockTransport(handler)),
+    )
+    with pytest.raises(ZenturePollingStoppedError):
+        [
+            message
+            async for message in client.runs.iter_events(
+                RUN_ID, timeout=30.0, stop=stop, initial_interval=0.0, max_interval=0.0
+            )
+        ]
+
+    assert stop_calls == 2
+    assert windows == [0.25]
     await client.aclose()
 
 

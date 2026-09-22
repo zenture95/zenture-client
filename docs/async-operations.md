@@ -65,6 +65,12 @@ schedule. Do not poll faster than once per second per operation, stop polling as
 soon as the operation reaches a terminal status, and honor `Retry-After` if the
 API returns `429`.
 
+The same finite wait contract applies to sync and async public Run clients:
+`runs.wait(...)` uses the first observed `deadline_at` plus the fixed 35-second
+recovery allowance and one polling interval when its timeout is omitted. An
+explicit finite timeout always wins. If stream consumption is unavailable,
+bounded Run polling is the fallback.
+
 ## Async Examples
 
 ```python

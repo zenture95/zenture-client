@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from typing import TYPE_CHECKING
 
 from pydantic import model_validator
@@ -79,3 +80,25 @@ def should_stop_polling(stop: Callable[[], bool] | None) -> bool:
     if stop is None:
         return False
     return stop()
+
+
+def validate_wait_parameters(
+    *, timeout: float | None, initial_interval: float, max_interval: float
+) -> None:
+    """Validate one finite wait budget and its polling intervals."""
+
+    values = {
+        "initial_interval": initial_interval,
+        "max_interval": max_interval,
+    }
+    if timeout is not None:
+        values["timeout"] = timeout
+    for name, value in values.items():
+        if isinstance(value, bool) or not isinstance(value, int | float) or not math.isfinite(value):
+            raise ValueError(f"{name} must be finite")
+    if timeout is not None and timeout <= 0:
+        raise ValueError("timeout must be positive")
+    if initial_interval < 0:
+        raise ValueError("initial_interval must not be negative")
+    if max_interval < initial_interval:
+        raise ValueError("max_interval must be greater than or equal to initial_interval")

@@ -580,3 +580,75 @@ def test_run_success_models_enforce_gateway_upload_and_cursor_constraints() -> N
     for invalid in ("", "ref with spaces", "ref+plus", "ref?query", "ref#fragment", "é"):
         with pytest.raises(ValidationError):
             PublicRunEvent.model_validate({**event, "terminal_refs": [invalid]})
+
+
+def test_run_responses_accept_additive_fields_but_keep_known_fields_strict() -> None:
+    from pydantic import ValidationError
+
+    from zenture._contract import PrepareKnowledgeRunRequest, PublicRunListItem, PublicRunResponse
+
+    run = {
+        "run_id": "run_1234567890abcdef",
+        "generation": 1,
+        "family": "knowledge",
+        "work_type": "answer",
+        "profile": "standard",
+        "status": "queued",
+        "created_at": "2026-01-01T00:00:00Z",
+        "updated_at": "2026-01-01T00:00:00Z",
+        "deadline_at": "2026-01-01T00:01:00Z",
+        "queue": {
+            "queue_reason": "queue:admitted",
+            "jobs_ahead": 0,
+            "future_queue_hint": "ignored",
+        },
+        "future_run_field": {"opaque": True},
+    }
+    response = PublicRunResponse.model_validate(run)
+
+    assert response.deadline_at is not None
+    assert response.deadline_at.isoformat() == "2026-01-01T00:01:00+00:00"
+    assert not hasattr(response, "future_run_field")
+    list_item = PublicRunListItem.model_validate(
+        {
+            "run_id": run["run_id"],
+            "status": run["status"],
+            "profile": run["profile"],
+            "created_at": run["created_at"],
+            "updated_at": run["updated_at"],
+            "deadline_at": run["deadline_at"],
+            "future_list_field": True,
+        }
+    )
+    assert list_item.deadline_at == response.deadline_at
+
+    with pytest.raises(ValidationError):
+        PublicRunResponse.model_validate({**run, "status": "future_status"})
+    with pytest.raises(ValidationError):
+        PrepareKnowledgeRunRequest.model_validate(
+            {
+                "task": "review",
+                "artifact": {"type": "text", "value": "answer"},
+                "future_request_field": True,
+            }
+        )
+
+
+def test_run_deadline_requires_an_aware_timestamp() -> None:
+    from pydantic import ValidationError
+
+    from zenture._contract import PublicRunResponse
+
+    run = {
+        "run_id": "run_1234567890abcdef",
+        "generation": 1,
+        "family": "knowledge",
+        "work_type": "answer",
+        "profile": "standard",
+        "status": "queued",
+        "created_at": "2026-01-01T00:00:00Z",
+        "updated_at": "2026-01-01T00:00:00Z",
+    }
+
+    with pytest.raises(ValidationError):
+        PublicRunResponse.model_validate({**run, "deadline_at": "2026-01-01T00:01:00"})

@@ -8,6 +8,8 @@ state.
 
 ## Unreleased
 
+- Added nullable `deadline_at` Run response fields, additive response tolerance,
+  and finite sync/async Run waits with deadline-aware timeout context.
 - Added an opt-in, internal MCP client peer adapter with sync/async transport
   ports, official Streamable HTTP integration, typed Run mappings, bounded safe
   errors and local cross-channel composition tests. The API-only installation

@@ -158,11 +158,15 @@ class ZenturePollingTimeoutError(ZentureError):
         operation_id: str | None = None,
         idempotency_key: str | None = None,
         last_request_id: str | None = None,
+        last_status: str | None = None,
+        observed_deadline: str | None = None,
     ) -> None:
         self.message = redact_text(message)
         self.operation_id = operation_id
         self.idempotency_key = idempotency_key
         self.last_request_id = last_request_id
+        self.last_status = last_status
+        self.observed_deadline = observed_deadline
         super().__init__(self.message)
 
 

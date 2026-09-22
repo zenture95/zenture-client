@@ -292,6 +292,22 @@ def test_sync_mcp_peer_maps_all_product_tools_to_canonical_models() -> None:
     }
 
 
+def test_mcp_run_peer_preserves_deadline_and_ignores_additive_response_fields() -> None:
+    responses = _responses()
+    responses["get_run"] = {
+        **_run(),
+        "deadline_at": "2026-09-01T12:05:00Z",
+        "future_run_field": {"opaque": True},
+    }
+    client = McpClient(RecordingTransport(responses))
+
+    read = client.get_run(RUN_ID)
+
+    assert read.run.deadline_at is not None
+    assert read.run.deadline_at.isoformat() == "2026-09-01T12:05:00+00:00"
+    assert not hasattr(read.run, "future_run_field")
+
+
 @pytest.mark.asyncio
 async def test_async_mcp_peer_preserves_the_same_typed_boundary() -> None:
     transport = AsyncRecordingTransport(_responses())

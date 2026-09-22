@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 import asyncio
+import time
 from contextlib import asynccontextmanager
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, Any, cast
 
 import httpx
 
@@ -99,6 +100,7 @@ class AsyncTransport:
         params: dict[str, str] | None = None,
         content: bytes | AsyncIterable[bytes] | None = None,
         replayable: bool = True,
+        timeout: float | None = None,
     ) -> object:
         """Request a JSON response and map public API errors."""
 
@@ -111,6 +113,7 @@ class AsyncTransport:
             params=params,
             content=content,
             replayable=replayable,
+            timeout=timeout,
         )
         response_error: ZentureResponseError | None = None
         try:
@@ -175,6 +178,7 @@ class AsyncTransport:
         params: dict[str, str] | None,
         content: bytes | AsyncIterable[bytes] | None = None,
         replayable: bool = True,
+        timeout: float | None = None,
     ) -> httpx.Response:
         request_headers = self._request_headers(auth=auth)
         if headers is not None:
@@ -182,26 +186,37 @@ class AsyncTransport:
 
         attempt = 1
         max_attempts = self._config.max_retries + 1
+        request_deadline = time.monotonic() + timeout if timeout is not None else None
         while True:
             response: httpx.Response | None = None
             transport_error: ZentureTransportError | None = None
             try:
+                request_timeout = (
+                    None
+                    if request_deadline is None
+                    else max(0.0, request_deadline - time.monotonic())
+                )
+                if request_timeout is not None and request_timeout <= 0:
+                    raise httpx.ReadTimeout("request deadline exceeded")
                 if content is None:
-                    response = await self._client.request(
-                        method,
-                        build_url(self._config, path),
-                        headers=request_headers,
-                        params=params,
-                        json=json,
-                    )
+                    request_kwargs: dict[str, Any] = {
+                        "headers": request_headers,
+                        "params": params,
+                        "json": json,
+                    }
                 else:
-                    response = await self._client.request(
-                        method,
-                        build_url(self._config, path),
-                        headers=request_headers,
-                        params=params,
-                        content=content,
-                    )
+                    request_kwargs = {
+                        "headers": request_headers,
+                        "params": params,
+                        "content": content,
+                    }
+                if request_timeout is not None:
+                    request_kwargs["timeout"] = request_timeout
+                response = await self._client.request(
+                    method,
+                    build_url(self._config, path),
+                    **request_kwargs,
+                )
             except httpx.HTTPError as exc:
                 decision = should_retry(
                     method=method,
@@ -218,8 +233,12 @@ class AsyncTransport:
                         initial_backoff=self._config.initial_retry_backoff,
                         max_backoff=self._config.max_retry_backoff,
                     )
+                    if request_deadline is not None:
+                        delay = min(delay, max(0.0, request_deadline - time.monotonic()))
                     if delay > 0:
                         await asyncio.sleep(delay)
+                    if request_deadline is not None and time.monotonic() >= request_deadline:
+                        raise ZentureTransportError("request deadline exceeded") from None
                     attempt += 1
                     continue
                 transport_error = ZentureTransportError(redact_text(str(exc)))
@@ -262,8 +281,12 @@ class AsyncTransport:
                     initial_backoff=self._config.initial_retry_backoff,
                     max_backoff=self._config.max_retry_backoff,
                 )
+                if request_deadline is not None:
+                    delay = min(delay, max(0.0, request_deadline - time.monotonic()))
                 if delay > 0:
                     await asyncio.sleep(delay)
+                if request_deadline is not None and time.monotonic() >= request_deadline:
+                    raise ZentureTransportError("request deadline exceeded") from None
                 attempt += 1
                 continue
 

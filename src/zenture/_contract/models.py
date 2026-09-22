@@ -23,6 +23,12 @@ _SAFE_ARTIFACT_REF_RE = re.compile(r"^[A-Za-z][A-Za-z0-9_./:-]*:[A-Za-z0-9_./:-]
 _UPLOAD_ID_RE = re.compile(r"^upload_[A-Za-z0-9_-]{8,128}$")
 
 
+class _RunResponseModel(SDKBaseModel):
+    """Strict known fields with tolerant additive response members."""
+
+    model_config = ConfigDict(extra="ignore", frozen=True, strict=True)
+
+
 class OperationStatus(StrEnum):
     """Public operation lifecycle statuses."""
 
@@ -130,13 +136,13 @@ class PublicAmountBilled(SDKBaseModel):
     unit: Literal["credits"] = "credits"
 
 
-class AvailableCreditAmount(SDKBaseModel):
+class AvailableCreditAmount(_RunResponseModel):
     status: Literal["available"]
     amount: str = Field(pattern=r"^(0|[1-9][0-9]{0,11})\.[0-9]{2}$")
     unit: Literal["credits"]
 
 
-class UnavailableCreditAmount(SDKBaseModel):
+class UnavailableCreditAmount(_RunResponseModel):
     status: Literal["unavailable"]
     reason_code: Literal[
         "invalid_scale", "missing_scale", "unsupported_scale",
@@ -150,19 +156,19 @@ CreditAmountProjectionV1 = Annotated[
 ]
 
 
-class PrepareCreditsProjectionV1(SDKBaseModel):
+class PrepareCreditsProjectionV1(_RunResponseModel):
     schema_version: Literal["run.prepare_credits_projection.v1"]
     estimated_credits: CreditAmountProjectionV1
     maximum_credits: CreditAmountProjectionV1
 
 
-class TerminalBillingProjectionV1(SDKBaseModel):
+class TerminalBillingProjectionV1(_RunResponseModel):
     schema_version: Literal["run.terminal_billing_projection.v1"] = "run.terminal_billing_projection.v1"
     status: Literal["pending", "settled", "released", "unavailable"]
     final_credits: CreditAmountProjectionV1 | None
 
     @model_validator(mode="after")
-    def _status_matches_amount(self) -> "TerminalBillingProjectionV1":
+    def _status_matches_amount(self) -> TerminalBillingProjectionV1:
         if self.status == "pending" and self.final_credits is not None:
             raise ValueError("pending billing must not expose final Credits")
         if self.status != "pending" and self.final_credits is None:
@@ -556,7 +562,7 @@ class RecordRunOutcomeRequest(SDKBaseModel):
         return self
 
 
-class PublicTaskContractSummary(SDKBaseModel):
+class PublicTaskContractSummary(_RunResponseModel):
     work_type: str = Field(min_length=1, max_length=64)
     summary_ref: str = Field(min_length=1, max_length=256)
     requirement_count: int = Field(ge=0, le=128)
@@ -596,7 +602,7 @@ class PrepareKnowledgeRunResponse(SDKBaseModel):
         return _coerce_tuple(value)
 
 
-class PublicCapabilityCoverage(SDKBaseModel):
+class PublicCapabilityCoverage(_RunResponseModel):
     available_refs: tuple[str, ...] = Field(default_factory=tuple, max_length=32)
     unavailable_refs: tuple[str, ...] = Field(default_factory=tuple, max_length=32)
     limitation_refs: tuple[str, ...] = Field(default_factory=tuple, max_length=32)
@@ -625,7 +631,7 @@ def _safe_result_text(value: object, *, maximum: int, field_name: str) -> str:
     return normalized
 
 
-class SafeResultFinding(SDKBaseModel):
+class SafeResultFinding(_RunResponseModel):
     finding_ref: str = Field(max_length=256, pattern=r"^finding:[A-Za-z0-9_./:-]{1,247}$")
     title: str = Field(min_length=1, max_length=256)
     summary: str = Field(min_length=1, max_length=2000)
@@ -644,7 +650,7 @@ class SafeResultFinding(SDKBaseModel):
         return _safe_result_text(value, maximum={"title": 256, "summary": 2000, "explanation": 4000}[info.field_name], field_name=info.field_name)
 
 
-class SafeResultEvidenceSummary(SDKBaseModel):
+class SafeResultEvidenceSummary(_RunResponseModel):
     evidence_ref: str = Field(max_length=256, pattern=r"^evidence:[A-Za-z0-9_./:-]{1,246}$")
     summary: str = Field(min_length=1, max_length=1000)
     assessment: Literal["supported", "contradicted", "uncertain"]
@@ -658,7 +664,7 @@ class SafeResultEvidenceSummary(SDKBaseModel):
         return _safe_result_text(value, maximum=1000 if info.field_name == "summary" else 256, field_name=info.field_name)
 
 
-class SafeResultLimitation(SDKBaseModel):
+class SafeResultLimitation(_RunResponseModel):
     limitation_ref: str = Field(max_length=256, pattern=r"^limitation:[A-Za-z0-9_./:-]{1,244}$")
     summary: str = Field(min_length=1, max_length=512)
 
@@ -668,7 +674,7 @@ class SafeResultLimitation(SDKBaseModel):
         return _safe_result_text(value, maximum=512, field_name="summary")
 
 
-class SafeResultDecision(SDKBaseModel):
+class SafeResultDecision(_RunResponseModel):
     outcome: Literal["ready", "revise", "human_review", "insufficient_evidence"]
     reason_code: str = Field(min_length=1, max_length=128, pattern=r"^[A-Za-z0-9_.-]{1,128}$")
     next_action: str = Field(min_length=1, max_length=256)
@@ -679,7 +685,7 @@ class SafeResultDecision(SDKBaseModel):
         return _safe_result_text(value, maximum=256, field_name="next_action")
 
 
-class SafeResultCoverageItem(SDKBaseModel):
+class SafeResultCoverageItem(_RunResponseModel):
     check_intent_ref: str | None = Field(default=None, max_length=256, pattern=r"^check-intent:[A-Za-z0-9_./:-]{1,243}$")
     requirement_ref: str | None = Field(default=None, max_length=256, pattern=r"^(?:review-requirement|requirement):[A-Za-z0-9_./:-]{1,237}$")
     status: Literal["performed", "skipped_optional", "unavailable", "failed", "degraded"]
@@ -696,13 +702,13 @@ class SafeResultCoverageItem(SDKBaseModel):
         return values
 
     @model_validator(mode="after")
-    def _one_subject(self) -> "SafeResultCoverageItem":
+    def _one_subject(self) -> SafeResultCoverageItem:
         if (self.check_intent_ref is None) == (self.requirement_ref is None):
             raise ValueError("coverage item must identify exactly one subject")
         return self
 
 
-class SafeResultCoverage(SDKBaseModel):
+class SafeResultCoverage(_RunResponseModel):
     coverage_ref: str = Field(max_length=256, pattern=r"^coverage:[A-Za-z0-9_./:-]{1,246}$")
     items: tuple[SafeResultCoverageItem, ...] = Field(min_length=1, max_length=256)
 
@@ -712,7 +718,7 @@ class SafeResultCoverage(SDKBaseModel):
         return _coerce_tuple(value)
 
 
-class ComposedSafeResultContentV1(SDKBaseModel):
+class ComposedSafeResultContentV1(_RunResponseModel):
     schema_version: Literal["run.composed_safe_result_content.v1"]
     summary: str = Field(min_length=1, max_length=4000)
     findings: tuple[SafeResultFinding, ...] = Field(default_factory=tuple, max_length=64)
@@ -735,12 +741,12 @@ class ComposedSafeResultContentV1(SDKBaseModel):
         return _safe_result_text(value, maximum=4000, field_name="summary")
 
 
-class SafeResultContentAvailableV1(SDKBaseModel):
+class SafeResultContentAvailableV1(_RunResponseModel):
     status: Literal["available"]
     content: ComposedSafeResultContentV1
 
 
-class SafeResultContentUnavailableV1(SDKBaseModel):
+class SafeResultContentUnavailableV1(_RunResponseModel):
     status: Literal["unavailable"]
     reason_code: Literal["legacy_result", "projection_incomplete", "result_content_unavailable"]
 
@@ -751,7 +757,7 @@ SafeResultContentProjectionV1 = Annotated[
 ]
 
 
-class PublicQueueProjection(SDKBaseModel):
+class PublicQueueProjection(_RunResponseModel):
     queue_reason: str = Field(min_length=1, max_length=128)
     jobs_ahead: int = Field(ge=0, le=50)
     estimated_start_seconds: dict[str, int] | None = None
@@ -764,7 +770,7 @@ class PublicQueueProjection(SDKBaseModel):
         return _coerce_aware_datetime(value)
 
 
-class PublicRunResponse(SDKBaseModel):
+class PublicRunResponse(_RunResponseModel):
     run_id: str = Field(pattern=r"^run_[A-Za-z0-9_-]{3,128}$")
     generation: int = Field(ge=1)
     family: Literal["knowledge"] = "knowledge"
@@ -773,6 +779,7 @@ class PublicRunResponse(SDKBaseModel):
     status: RunStatus
     created_at: AwareDatetime
     updated_at: AwareDatetime
+    deadline_at: AwareDatetime | None = None
     started_at: AwareDatetime | None = None
     completed_at: AwareDatetime | None = None
     queue: PublicQueueProjection | None = None
@@ -800,7 +807,9 @@ class PublicRunResponse(SDKBaseModel):
             return None
         return validate_run_cursor(value, field="event_cursor")
 
-    @field_validator("created_at", "updated_at", "started_at", "completed_at", mode="before")
+    @field_validator(
+        "created_at", "updated_at", "started_at", "completed_at", "deadline_at", mode="before"
+    )
     @classmethod
     def _timestamps(cls, value: object) -> object:
         return _coerce_aware_datetime(value)
@@ -837,7 +846,7 @@ class PublicRunResponse(SDKBaseModel):
         return _coerce_tuple(value)
 
 
-class PublicRunListItem(SDKBaseModel):
+class PublicRunListItem(_RunResponseModel):
     run_id: str = Field(pattern=r"^run_[A-Za-z0-9_-]{3,128}$")
     status: RunStatus
     decision: PublicDecision | None = None
@@ -845,8 +854,9 @@ class PublicRunListItem(SDKBaseModel):
     profile: RunProfile
     created_at: AwareDatetime
     updated_at: AwareDatetime
+    deadline_at: AwareDatetime | None = None
 
-    @field_validator("created_at", "updated_at", mode="before")
+    @field_validator("created_at", "updated_at", "deadline_at", mode="before")
     @classmethod
     def _timestamps(cls, value: object) -> object:
         return _coerce_aware_datetime(value)
@@ -867,7 +877,7 @@ class PublicRunListItem(SDKBaseModel):
         return PublicDecision(value) if isinstance(value, str) else value
 
 
-class ListRunsResponse(SDKBaseModel):
+class ListRunsResponse(_RunResponseModel):
     runs: tuple[PublicRunListItem, ...]
     has_more: bool
     next_cursor: str | None = Field(
@@ -887,7 +897,7 @@ class ListRunsResponse(SDKBaseModel):
         return _coerce_tuple(value)
 
 
-class PublicRunEvent(SDKBaseModel):
+class PublicRunEvent(_RunResponseModel):
     type: Literal["run.event"]
     event_id: str = Field(min_length=1, max_length=128, pattern=r"^[A-Za-z0-9._:-]+$")
     run_id: str = Field(pattern=r"^run_[A-Za-z0-9_-]{3,128}$")
@@ -914,14 +924,14 @@ class PublicRunEvent(SDKBaseModel):
         return validate_terminal_refs(value)
 
 
-class PublicRunHeartbeat(SDKBaseModel):
+class PublicRunHeartbeat(_RunResponseModel):
     type: Literal["run.heartbeat"]
     event_id: str = Field(min_length=1, max_length=128, pattern=r"^[A-Za-z0-9._:-]+$")
     run_id: str = Field(pattern=r"^run_[A-Za-z0-9_-]{3,128}$")
     sequence: int = Field(ge=0)
 
 
-class PublicRunStreamError(SDKBaseModel):
+class PublicRunStreamError(_RunResponseModel):
     type: Literal["run.error"]
     event_id: str = Field(min_length=1, max_length=128, pattern=r"^[A-Za-z0-9._:-]+$")
     run_id: str = Field(pattern=r"^run_[A-Za-z0-9_-]{3,128}$")
@@ -935,7 +945,7 @@ class PublicRunStreamError(SDKBaseModel):
 PublicRunStreamMessage = PublicRunEvent | PublicRunHeartbeat | PublicRunStreamError
 
 
-class ListRunEventsResponse(SDKBaseModel):
+class ListRunEventsResponse(_RunResponseModel):
     events: tuple[PublicRunEvent, ...]
     has_more: bool
     next_cursor: str | None = Field(

@@ -397,6 +397,14 @@ stopped, the exception exposes `operation_id` and `idempotency_key` attributes.
 Use `client.operations.get(exc.operation_id)` or retry with the same
 `exc.idempotency_key`. Do not retry a billable mutation with a new key.
 
+For public Runs, `client.runs.wait(run_id)` is always finite. When the first
+response includes `deadline_at`, an omitted timeout ends at that deadline plus
+the fixed 35-second recovery allowance and one polling interval. A caller
+supplied finite timeout remains authoritative. The timeout exception includes
+the last status and observed deadline as safe metadata. Run event streaming
+remains an optional lower-latency path; `runs.wait(...)` is the bounded polling
+fallback when a stream is unavailable.
+
 ## Pagination
 
 List-style read helpers support `limit` and `cursor`. The default page size is

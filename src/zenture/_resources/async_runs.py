@@ -31,6 +31,8 @@ from zenture._resources.runs import (
     ARTIFACT_CHUNK_SIZE,
     MAX_STREAM_EVENT_BYTES,
     RunEventStreamState,
+    _deadline_bound,
+    _polling_timeout,
     add_wait_header,
     is_retryable_stream_error,
     is_terminal_status,
@@ -47,8 +49,10 @@ from zenture.errors import (
     ZentureAPIError,
     ZenturePollingStoppedError,
     ZenturePollingTimeoutError,
+    ZentureResponseError,
     ZentureTransportError,
 )
+from zenture.polling import validate_wait_parameters
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterable, AsyncIterator, Callable, Sequence
@@ -231,12 +235,14 @@ class AsyncRunsResource:
         payload = await self._transport.request_json("GET", "/runs", params=params)
         return parse_response(ListRunsResponse, payload)
 
-    async def get(self, run_id: str, *, view: str = "summary") -> PublicRunResponse:
+    async def get(
+        self, run_id: str, *, view: str = "summary", _timeout: float | None = None
+    ) -> PublicRunResponse:
         validate_run_id(run_id)
         if view not in {"summary", "full"}:
             raise ValueError("view must be summary or full")
         payload = await self._transport.request_json(
-            "GET", f"/runs/{path_segment(run_id)}", params={"view": view}
+            "GET", f"/runs/{path_segment(run_id)}", params={"view": view}, timeout=_timeout
         )
         return parse_run_response(payload, expected_run_id=run_id)
 
@@ -334,22 +340,55 @@ class AsyncRunsResource:
         self,
         run_id: str,
         *,
-        timeout: float = 120.0,
+        timeout: float | None = None,
         initial_interval: float = 1.0,
         max_interval: float = 8.0,
         stop: Any = None,
     ) -> PublicRunResponse:
         validate_run_id(run_id)
-        if timeout <= 0:
-            raise ValueError("timeout must be positive")
-        deadline = time.monotonic() + timeout
+        validate_wait_parameters(
+            timeout=timeout, initial_interval=initial_interval, max_interval=max_interval
+        )
+        deadline = time.monotonic() + (timeout if timeout is not None else 120.0)
         interval = initial_interval
+        observed_deadline: object | None = None
+        last_status = None
         while True:
             if callable(stop) and stop():
                 raise ZenturePollingStoppedError(operation_id=run_id)
             if time.monotonic() >= deadline:
-                raise ZenturePollingTimeoutError(operation_id=run_id)
-            result = await self.get(run_id)
+                raise _polling_timeout(
+                    run_id=run_id,
+                    last_status=last_status,
+                    observed_deadline=observed_deadline,
+                )
+            result = await self.get(run_id, _timeout=max(0.0, deadline - time.monotonic()))
+            if time.monotonic() >= deadline:
+                raise _polling_timeout(
+                    run_id=run_id,
+                    last_status=result.status,
+                    observed_deadline=observed_deadline,
+                )
+            if callable(stop) and stop():
+                raise ZenturePollingStoppedError(operation_id=run_id)
+            last_status = result.status
+            if (
+                observed_deadline is not None
+                and result.deadline_at is not None
+                and result.deadline_at != observed_deadline
+            ):
+                raise ZentureResponseError(
+                    "Public API response deadline_at changed during Run polling."
+                )
+            if observed_deadline is None and result.deadline_at is not None:
+                observed_deadline = result.deadline_at
+                if timeout is None:
+                    deadline = _deadline_bound(
+                        observed_deadline,
+                        now_monotonic=time.monotonic(),
+                        now_wall=time.time(),
+                        max_interval=max_interval,
+                    )
             if is_terminal_status(result.status):
                 return result
             await asyncio.sleep(min(interval, max(0.0, deadline - time.monotonic())))

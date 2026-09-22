@@ -1725,6 +1725,13 @@
       "PublicRunListItem": {
         "additionalProperties": false,
         "properties": {
+          "deadline_at": {
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "created_at": {
             "format": "date-time",
             "type": "string"
@@ -1976,6 +1983,13 @@
       "PublicRunResponse": {
         "additionalProperties": false,
         "properties": {
+          "deadline_at": {
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "acceptance_decision": {
             "enum": [
               "ready",

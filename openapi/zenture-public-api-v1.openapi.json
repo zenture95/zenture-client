@@ -184,7 +184,7 @@
         "type": "object"
       },
       "AvailableCreditAmount": {
-        "additionalProperties": false,
+        "additionalProperties": true,
         "properties": {
           "amount": {
             "pattern": "^(0|[1-9][0-9]{0,11})\\.[0-9]{2}$",
@@ -292,7 +292,7 @@
         "type": "object"
       },
       "ComposedSafeResultContentV1": {
-        "additionalProperties": false,
+        "additionalProperties": true,
         "properties": {
           "coverage": {
             "$ref": "#/components/schemas/SafeResultCoverage"
@@ -562,7 +562,7 @@
         "type": "string"
       },
       "PrepareCreditsProjectionV1": {
-        "additionalProperties": false,
+        "additionalProperties": true,
         "properties": {
           "estimated_credits": {
             "$ref": "#/components/schemas/CreditAmountProjectionV1"
@@ -609,7 +609,7 @@
         "type": "object"
       },
       "PrepareRunResponse": {
-        "additionalProperties": false,
+        "additionalProperties": true,
         "properties": {
           "billing_projection": {
             "anyOf": [
@@ -738,7 +738,7 @@
         "type": "object"
       },
       "PublicCapabilityCoverage": {
-        "additionalProperties": false,
+        "additionalProperties": true,
         "properties": {
           "available_refs": {
             "items": {
@@ -1398,7 +1398,7 @@
         "type": "object"
       },
       "PublicQueueProjection": {
-        "additionalProperties": false,
+        "additionalProperties": true,
         "properties": {
           "estimate_as_of": {
             "format": "date-time",
@@ -1409,7 +1409,6 @@
           },
           "estimated_completion_seconds": {
             "additionalProperties": {
-              "minimum": 0,
               "type": "integer"
             },
             "type": [
@@ -1419,7 +1418,6 @@
           },
           "estimated_start_seconds": {
             "additionalProperties": {
-              "minimum": 0,
               "type": "integer"
             },
             "type": [
@@ -1477,7 +1475,7 @@
         "type": "object"
       },
       "PublicRunCollectionResponse": {
-        "additionalProperties": false,
+        "additionalProperties": true,
         "properties": {
           "has_more": {
             "type": "boolean"
@@ -1576,10 +1574,12 @@
         "type": "object"
       },
       "PublicRunEvent": {
-        "additionalProperties": false,
+        "additionalProperties": true,
         "properties": {
           "estimated_completion_seconds": {
-            "additionalProperties": false,
+            "additionalProperties": {
+              "type": "integer"
+            },
             "properties": {
               "max": {
                 "maximum": 604800,
@@ -1598,7 +1598,9 @@
             ]
           },
           "estimated_start_seconds": {
-            "additionalProperties": false,
+            "additionalProperties": {
+              "type": "integer"
+            },
             "properties": {
               "max": {
                 "maximum": 86400,
@@ -1694,7 +1696,7 @@
         "type": "object"
       },
       "PublicRunEventsResponse": {
-        "additionalProperties": false,
+        "additionalProperties": true,
         "properties": {
           "events": {
             "items": {
@@ -1723,18 +1725,18 @@
         "type": "string"
       },
       "PublicRunListItem": {
-        "additionalProperties": false,
+        "additionalProperties": true,
         "properties": {
+          "created_at": {
+            "format": "date-time",
+            "type": "string"
+          },
           "deadline_at": {
             "format": "date-time",
             "type": [
               "string",
               "null"
             ]
-          },
-          "created_at": {
-            "format": "date-time",
-            "type": "string"
           },
           "decision": {
             "type": [
@@ -1778,7 +1780,7 @@
         "type": "object"
       },
       "PublicRunOutcomeResponse": {
-        "additionalProperties": false,
+        "additionalProperties": true,
         "properties": {
           "acceptance_decision": {
             "enum": [
@@ -1843,6 +1845,13 @@
           "created_at": {
             "format": "date-time",
             "type": "string"
+          },
+          "deadline_at": {
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "event_cursor": {
             "type": [
@@ -1981,15 +1990,8 @@
         "type": "object"
       },
       "PublicRunResponse": {
-        "additionalProperties": false,
+        "additionalProperties": true,
         "properties": {
-          "deadline_at": {
-            "format": "date-time",
-            "type": [
-              "string",
-              "null"
-            ]
-          },
           "acceptance_decision": {
             "enum": [
               "ready",
@@ -2053,6 +2055,13 @@
           "created_at": {
             "format": "date-time",
             "type": "string"
+          },
+          "deadline_at": {
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "event_cursor": {
             "type": [
@@ -2218,7 +2227,7 @@
         "type": "object"
       },
       "PublicTaskContractSummary": {
-        "additionalProperties": false,
+        "additionalProperties": true,
         "properties": {
           "requirement_count": {
             "default": 0,
@@ -2415,7 +2424,7 @@
         "type": "object"
       },
       "SafeResultContentAvailableV1": {
-        "additionalProperties": false,
+        "additionalProperties": true,
         "properties": {
           "content": {
             "$ref": "#/components/schemas/ComposedSafeResultContentV1"
@@ -2444,7 +2453,7 @@
         ]
       },
       "SafeResultContentUnavailableV1": {
-        "additionalProperties": false,
+        "additionalProperties": true,
         "properties": {
           "reason_code": {
             "enum": [
@@ -2465,7 +2474,7 @@
         "type": "object"
       },
       "SafeResultCoverage": {
-        "additionalProperties": false,
+        "additionalProperties": true,
         "properties": {
           "coverage_ref": {
             "maxLength": 256,
@@ -2488,7 +2497,7 @@
         "type": "object"
       },
       "SafeResultCoverageItem": {
-        "additionalProperties": false,
+        "additionalProperties": true,
         "properties": {
           "artifact_refs": {
             "items": {
@@ -2544,7 +2553,7 @@
         "type": "object"
       },
       "SafeResultDecision": {
-        "additionalProperties": false,
+        "additionalProperties": true,
         "properties": {
           "next_action": {
             "maxLength": 256,
@@ -2576,7 +2585,7 @@
         "type": "object"
       },
       "SafeResultEvidenceSummary": {
-        "additionalProperties": false,
+        "additionalProperties": true,
         "properties": {
           "assessment": {
             "enum": [
@@ -2613,7 +2622,7 @@
         "type": "object"
       },
       "SafeResultFinding": {
-        "additionalProperties": false,
+        "additionalProperties": true,
         "properties": {
           "confidence": {
             "enum": [
@@ -2668,7 +2677,7 @@
         "type": "object"
       },
       "SafeResultLimitation": {
-        "additionalProperties": false,
+        "additionalProperties": true,
         "properties": {
           "limitation_ref": {
             "maxLength": 256,
@@ -2720,7 +2729,7 @@
         "type": "object"
       },
       "TerminalBillingProjectionV1": {
-        "additionalProperties": false,
+        "additionalProperties": true,
         "properties": {
           "final_credits": {
             "anyOf": [
@@ -2774,7 +2783,7 @@
         "type": "object"
       },
       "UnavailableCreditAmount": {
-        "additionalProperties": false,
+        "additionalProperties": true,
         "properties": {
           "reason_code": {
             "enum": [

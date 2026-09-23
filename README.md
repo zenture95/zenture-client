@@ -80,6 +80,22 @@ For raw JSON response bodies and SDK model mapping, see
 The opt-in MCP peer adapter is documented in
 [`docs/mcp-client.md`](./docs/mcp-client.md).
 
+## Agent And Interface Governance
+
+**Repository role:** This repository implements the server-side Python Public
+API client and the opt-in MCP peer adapter. Its committed OpenAPI artifact is
+the SDK-local contract mirror, not the authority for Backend product behavior
+or gateway routes.
+
+**Canonical authorities:** Follow [`AGENTS.md`](./AGENTS.md) for SDK changes.
+The public gateway OpenAPI owns REST shapes; Backend owns Run status, billing,
+auth, and tenant behavior. The workspace
+`governance/interface-registry/registry.yml` records interface ownership,
+consumers, lifecycle, and compatibility without replacing those authorities.
+For cross-repository interface changes, run
+`governance/interface-registry/logic/scripts/check_interface_registry.py` with
+`--mode strict-workspace` from the workspace root.
+
 ## Sync Quickstart
 
 ```python

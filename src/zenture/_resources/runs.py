@@ -64,7 +64,9 @@ _TERMINAL_STATUSES = frozenset(
         RunStatus.BUDGET_EXHAUSTED,
     }
 )
-_TERMINAL_STREAM_STATUSES = frozenset({"completed", "failed", "cancelled"})
+_TERMINAL_STREAM_STATUSES = frozenset(
+    {"completed", "failed", "cancelled", "expired", "budget_exhausted"}
+)
 _RETRYABLE_STREAM_STATUS_CODES = frozenset({408, 429, 500, 502, 503, 504})
 _RETRYABLE_STREAM_ERROR_CODES = frozenset(
     {"capacity_unavailable", "dependency_unavailable", "internal_error", "rate_limited"}

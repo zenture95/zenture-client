@@ -87,6 +87,38 @@ def test_public_run_response_coerces_wire_decision_to_strict_enum() -> None:
     assert response.acceptance_decision.value == "ready"
 
 
+@pytest.mark.parametrize("status", ["expired", "cancel_requested", "budget_exhausted"])
+def test_public_run_event_accepts_lifecycle_statuses(status: str) -> None:
+    event = PublicRunEvent.model_validate(
+        {
+            "type": "run.event",
+            "event_id": "event_lifecycle",
+            "run_id": RUN_ID,
+            "sequence": 1,
+            "status": status,
+            "message_key": f"run.status.{status}",
+            "event_cursor": "cursor_lifecycle",
+        }
+    )
+
+    assert event.status == status
+
+
+def test_public_run_event_rejects_unknown_status() -> None:
+    with pytest.raises(ValueError):
+        PublicRunEvent.model_validate(
+            {
+                "type": "run.event",
+                "event_id": "event_unknown",
+                "run_id": RUN_ID,
+                "sequence": 1,
+                "status": "future_status",
+                "message_key": "run.status.future_status",
+                "event_cursor": "cursor_unknown",
+            }
+        )
+
+
 @pytest.mark.parametrize("status", ["completed", "succeeded"])
 def test_sync_run_list_forwards_success_filter_and_reads_success_status(status: str) -> None:
     requests: list[httpx.Request] = []
@@ -255,6 +287,58 @@ def test_sync_iter_events_reconnects_deduplicates_and_stops_at_terminal() -> Non
     assert len(requests) == 3
     assert requests[1].headers["last-event-id"] == "cursor_aaa"
     assert requests[2].headers["last-event-id"] == "cursor_aaa"
+    client.close()
+
+
+@pytest.mark.parametrize("status", ["expired", "budget_exhausted"])
+def test_sync_iter_events_stops_immediately_at_lifecycle_terminal(status: str) -> None:
+    requests: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        requests.append(request)
+        return _stream_response(
+            _sse_event(
+                event_id="event_terminal",
+                sequence=1,
+                status=status,
+                event_cursor="cursor_terminal",
+            )
+        )
+
+    client = Zenture(
+        api_key=API_KEY,
+        http_client=httpx.Client(transport=httpx.MockTransport(handler)),
+    )
+    messages = list(client.runs.iter_events(RUN_ID, initial_interval=0.0, max_interval=0.0))
+
+    assert [message.status for message in messages] == [status]
+    assert len(requests) == 1
+    client.close()
+
+
+def test_sync_iter_events_keeps_cancel_requested_nonterminal() -> None:
+    requests: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        requests.append(request)
+        status = "cancel_requested" if len(requests) == 1 else "cancelled"
+        return _stream_response(
+            _sse_event(
+                event_id=f"event_{len(requests)}",
+                sequence=len(requests),
+                status=status,
+                event_cursor=f"cursor_{len(requests)}",
+            )
+        )
+
+    client = Zenture(
+        api_key=API_KEY,
+        http_client=httpx.Client(transport=httpx.MockTransport(handler)),
+    )
+    messages = list(client.runs.iter_events(RUN_ID, initial_interval=0.0, max_interval=0.0))
+
+    assert [message.status for message in messages] == ["cancel_requested", "cancelled"]
+    assert len(requests) == 2
     client.close()
 
 

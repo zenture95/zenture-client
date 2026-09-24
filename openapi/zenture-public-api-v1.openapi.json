@@ -1666,7 +1666,10 @@
               "completed",
               "degraded",
               "failed",
-              "cancelled"
+              "cancelled",
+              "expired",
+              "cancel_requested",
+              "budget_exhausted"
             ],
             "type": "string"
           },

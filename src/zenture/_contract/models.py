@@ -903,7 +903,16 @@ class PublicRunEvent(_RunResponseModel):
     run_id: str = Field(pattern=r"^run_[A-Za-z0-9_-]{3,128}$")
     sequence: int = Field(ge=0)
     status: Literal[
-        "queued", "preparing", "running", "completed", "degraded", "failed", "cancelled"
+        "queued",
+        "preparing",
+        "running",
+        "completed",
+        "degraded",
+        "failed",
+        "cancelled",
+        "expired",
+        "cancel_requested",
+        "budget_exhausted",
     ]
     message_key: str = Field(min_length=1, max_length=128, pattern=r"^[a-z][a-z0-9_.-]{0,127}$")
     progress_percent: int | None = Field(default=None, ge=0, le=100)

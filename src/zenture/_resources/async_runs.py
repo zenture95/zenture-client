@@ -373,7 +373,7 @@ class AsyncRunsResource:
                 raise polling_timeout(
                     run_id=run_id,
                     last_status=result.status,
-                    observed_deadline=observed_deadline,
+                    observed_deadline=observed_deadline or result.deadline_at,
                 )
             if callable(stop) and stop():
                 raise ZenturePollingStoppedError(operation_id=run_id)

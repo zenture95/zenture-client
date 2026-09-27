@@ -1460,6 +1460,36 @@ def test_sync_wait_explicit_timeout_wins_over_server_deadline() -> None:
     client.close()
 
 
+def test_sync_wait_reports_deadline_when_terminal_response_crosses_explicit_timeout(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import zenture._resources.runs as runs_module
+
+    now = 1_000.0
+    deadline_at = "1970-01-01T00:33:20Z"
+    monkeypatch.setattr(
+        runs_module,
+        "time",
+        SimpleNamespace(monotonic=lambda: now, time=lambda: now, sleep=lambda _seconds: None),
+    )
+
+    def handler(_request: httpx.Request) -> httpx.Response:
+        nonlocal now
+        now += 0.6
+        return httpx.Response(200, json=_run(status="completed", deadline_at=deadline_at))
+
+    client = Zenture(
+        api_key=API_KEY,
+        http_client=httpx.Client(transport=httpx.MockTransport(handler)),
+    )
+    with pytest.raises(ZenturePollingTimeoutError) as exc_info:
+        client.runs.wait(RUN_ID, timeout=0.5)
+
+    assert exc_info.value.last_status == "completed"
+    assert exc_info.value.observed_deadline == "1970-01-01T00:33:20+00:00"
+    client.close()
+
+
 def test_sync_wait_passes_remaining_budget_to_each_run_request() -> None:
     read_timeouts: list[float] = []
 
@@ -1694,6 +1724,37 @@ async def test_async_wait_explicit_timeout_wins_over_a_server_deadline(
 
     assert calls == 2
     assert sleeps == [2.0, 1.0]
+    assert exc_info.value.observed_deadline == "1970-01-01T00:33:20+00:00"
+    await client.aclose()
+
+
+@pytest.mark.asyncio
+async def test_async_wait_reports_deadline_when_terminal_response_crosses_explicit_timeout(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import zenture._resources.async_runs as async_runs_module
+
+    now = 1_000.0
+    deadline_at = "1970-01-01T00:33:20Z"
+    monkeypatch.setattr(
+        async_runs_module,
+        "time",
+        SimpleNamespace(monotonic=lambda: now, time=lambda: now),
+    )
+
+    async def handler(_request: httpx.Request) -> httpx.Response:
+        nonlocal now
+        now += 0.6
+        return httpx.Response(200, json=_run(status="completed", deadline_at=deadline_at))
+
+    client = AsyncZenture(
+        api_key=API_KEY,
+        http_client=httpx.AsyncClient(transport=httpx.MockTransport(handler)),
+    )
+    with pytest.raises(ZenturePollingTimeoutError) as exc_info:
+        await client.runs.wait(RUN_ID, timeout=0.5)
+
+    assert exc_info.value.last_status == "completed"
     assert exc_info.value.observed_deadline == "1970-01-01T00:33:20+00:00"
     await client.aclose()
 

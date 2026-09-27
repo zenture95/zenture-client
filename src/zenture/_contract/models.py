@@ -165,7 +165,7 @@ class PrepareCreditsProjectionV1(_RunResponseModel):
 class TerminalBillingProjectionV1(_RunResponseModel):
     schema_version: Literal["run.terminal_billing_projection.v1"] = "run.terminal_billing_projection.v1"
     status: Literal["pending", "settled", "released", "unavailable"]
-    final_credits: CreditAmountProjectionV1 | None
+    final_credits: CreditAmountProjectionV1 | None = None
 
     @model_validator(mode="after")
     def _status_matches_amount(self) -> TerminalBillingProjectionV1:

@@ -748,7 +748,7 @@ class SafeResultContentAvailableV1(_RunResponseModel):
 
 class SafeResultContentUnavailableV1(_RunResponseModel):
     status: Literal["unavailable"]
-    reason_code: Literal["legacy_result", "projection_incomplete", "result_content_unavailable"]
+    reason_code: Literal["legacy_result", "projection_incomplete", "result_content_unavailable", "result_content_expired"]
 
 
 SafeResultContentProjectionV1 = Annotated[

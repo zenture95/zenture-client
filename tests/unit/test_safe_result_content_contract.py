@@ -76,6 +76,16 @@ def test_public_run_response_accepts_closed_unavailable_projection() -> None:
     assert response.safe_result_content.reason_code == "projection_incomplete"  # type: ignore[union-attr]
 
 
+def test_public_run_response_accepts_expired_guest_content() -> None:
+    payload = _run_payload()
+    payload["safe_result_content"] = {
+        "status": "unavailable",
+        "reason_code": "result_content_expired",
+    }
+    response = PublicRunResponse.model_validate(payload)
+    assert response.safe_result_content.reason_code == "result_content_expired"  # type: ignore[union-attr]
+
+
 def test_prepare_and_terminal_billing_projections_use_typed_credits() -> None:
     response = PrepareKnowledgeRunResponse.model_validate(
         {

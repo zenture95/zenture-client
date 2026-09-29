@@ -2465,7 +2465,8 @@
             "enum": [
               "legacy_result",
               "projection_incomplete",
-              "result_content_unavailable"
+              "result_content_unavailable",
+              "result_content_expired"
             ],
             "type": "string"
           },

@@ -366,3 +366,60 @@ def test_native_store_unavailable_fails_before_the_browser_opens(
 
     assert opened == []
     assert caught.value.next_action == "use_session_only"
+
+
+def _callback_response(redirect: str, port_query: str) -> str:
+    target = urllib.parse.urlsplit(redirect)
+    with socket.create_connection((target.hostname or "", target.port or 0), timeout=5) as conn:
+        conn.sendall(
+            f"GET {target.path}?{port_query} HTTP/1.1\r\nHost: {target.netloc}\r\n\r\n".encode()
+        )
+        received = b""
+        while chunk := conn.recv(4096):
+            received += chunk
+    return received.decode()
+
+
+def test_callback_page_before_redemption_makes_no_success_claim() -> None:
+    listener, redirect = bind_loopback()
+    state = "s" * 43
+    pages: list[str] = []
+    query = urllib.parse.urlencode({"state": state, "iss": "https://i", "code": "c"})
+    sender = threading.Thread(target=lambda: pages.append(_callback_response(redirect, query)))
+    sender.start()
+
+    wait_for_callback(
+        listener, redirect_uri=redirect, state=state, verifier="v", issuer="https://i", timeout=5
+    )
+    sender.join(5)
+
+    assert "Authorization received. Return to your terminal." in pages[0]
+    assert "connected" not in pages[0].lower()
+
+
+def test_stalled_local_connection_does_not_delay_the_real_callback() -> None:
+    listener, redirect = bind_loopback()
+    state = "s" * 43
+    port = urllib.parse.urlsplit(redirect).port
+    assert port is not None
+    stalled = socket.create_connection(("127.0.0.1", port), timeout=5)  # sends nothing
+    query = urllib.parse.urlencode({"state": state, "iss": "https://i", "code": "c"})
+    sender = threading.Thread(target=lambda: _callback_response(redirect, query))
+    sender.start()
+    try:
+        started = time.monotonic()
+        result = wait_for_callback(
+            listener,
+            redirect_uri=redirect,
+            state=state,
+            verifier="v",
+            issuer="https://i",
+            timeout=1.5,
+        )
+        elapsed = time.monotonic() - started
+    finally:
+        stalled.close()
+        sender.join(5)
+
+    assert result.code == "c"
+    assert elapsed < 1.5

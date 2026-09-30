@@ -259,7 +259,7 @@ def test_status_store_unavailable_when_the_credential_store_cannot_be_read(
         def save(self, _record: object) -> None:
             raise StoreError
 
-        def delete(self, _identity: RecordKey) -> None:
+        def delete(self, _identity: RecordKey) -> bool:
             raise StoreError
 
     opener, _ = browser_opener()
@@ -288,6 +288,19 @@ def test_clear_deletes_only_the_local_record_and_points_to_remote_revocation(
     assert "Verbindungen" in result.out
     assert requests_before == (len(env.issuer.token_requests), len(env.mcp.guard.requests))
     assert not env.issuer.grant_revoked()
+
+
+def test_clear_works_offline_and_deletes_without_any_network_request(
+    env: Environment, file_store: FileStore, lock_dir: Path
+) -> None:
+    run(["auth", "login"], _runtime(file_store, lock_dir), env)
+    env.stop()  # issuer and MCP server are gone: discovery is impossible
+
+    result = run(["auth", "clear"], _runtime(file_store, lock_dir), env)
+
+    assert result.code == 0
+    assert _stored(file_store, env) is None
+    assert "No stored authorization" not in result.out
 
 
 def test_clear_without_a_record_is_a_successful_no_op(

@@ -51,3 +51,31 @@ def is_secure_origin(url: str) -> bool:
 def origin(url: str) -> str:
     parsed = urlsplit(url)
     return f"{parsed.scheme}://{parsed.netloc}"
+
+
+_DEFAULT_PORTS = {"http": 80, "https": 443}
+
+
+def _authority(url: str) -> tuple[str, str, int] | None:
+    parsed = urlsplit(url)
+    scheme = parsed.scheme.lower()
+    if scheme not in _DEFAULT_PORTS or parsed.hostname is None:
+        return None
+    if parsed.username is not None or parsed.password is not None:
+        return None
+    try:
+        port = parsed.port or _DEFAULT_PORTS[scheme]
+    except ValueError:
+        return None
+    return scheme, parsed.hostname.lower(), port
+
+
+def within_resource(url: str, resource: str) -> bool:
+    """Whether ``url`` lies inside the resource: same origin and under the resource path."""
+
+    wanted = _authority(resource)
+    if wanted is None or _authority(url) != wanted:
+        return False
+    base = urlsplit(resource).path.rstrip("/")
+    path = urlsplit(url).path
+    return not base or path == base or path.startswith(base + "/")

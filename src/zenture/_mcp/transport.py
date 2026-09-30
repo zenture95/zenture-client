@@ -130,6 +130,11 @@ async def open_streamable_http_transport(
     target = endpoint if isinstance(endpoint, McpEndpoint) else McpEndpoint.from_value(endpoint)
     if type(timeout) not in {int, float} or timeout <= 0 or timeout > 300:
         raise ValueError("timeout must be between 0 and 300 seconds")
+    if session is not None:
+        from zenture._auth.model import within_resource
+
+        if not within_resource(target.url, session._core.discovery.resource):
+            raise ValueError("endpoint is outside the resource of this authorization session")
     token = await resolve_async_bearer_token(bearer_token) if bearer_token is not None else None
     try:
         mcp_module = importlib.import_module("mcp")
@@ -144,6 +149,7 @@ async def open_streamable_http_transport(
 
     yielded = False
     body_completed = False
+    caller_error: BaseException | None = None
     try:
         client_options: dict[str, Any] = {
             "timeout": timeout_type(timeout, read=timeout),
@@ -164,7 +170,11 @@ async def open_streamable_http_transport(
             mcp_session = await stack.enter_async_context(client_session(read_stream, write_stream))
             await mcp_session.initialize()
             yielded = True
-            yield _OfficialAsyncMcpTransport(mcp_session)
+            try:
+                yield _OfficialAsyncMcpTransport(mcp_session)
+            except BaseException as body_error:
+                caller_error = body_error
+                raise
             body_completed = True
     except asyncio.CancelledError:
         raise
@@ -173,6 +183,13 @@ async def open_streamable_http_transport(
     except Exception as exc:
         if body_completed:
             return
+        if (
+            caller_error is not None
+            and isinstance(exc, BaseExceptionGroup)
+            and _leaves(exc) == [caller_error]
+        ):
+            # The official task groups wrap the caller's own exception; hand it back as raised.
+            exc = caller_error if isinstance(caller_error, Exception) else exc
         failure = _auth_failure(exc)
         if failure is not None:
             raise failure from None
@@ -181,7 +198,7 @@ async def open_streamable_http_transport(
             and not body_completed
             and not _is_network_failure(exc, getattr(httpx2_module, "HTTPError", None))
         ):
-            raise
+            raise exc
         raise ZentureMCPError(
             "mcp_transport_unavailable",
             status_code=503,

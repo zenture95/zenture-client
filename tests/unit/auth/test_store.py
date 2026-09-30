@@ -192,3 +192,18 @@ def test_real_macos_keychain_roundtrip_with_the_explicit_backend() -> None:
     finally:
         store.delete(identity)
     assert store.load(identity) is None
+
+
+def test_protected_item_is_keyed_by_resource_and_client_only_and_issuer_is_verified_on_load() -> (
+    None
+):
+    backend = FakeBackend()
+    store = KeyringStore(backend)
+    store.save(_record())
+
+    other_issuer = RecordKey("https://other-issuer.example", KEY.resource, KEY.client_id)
+    assert store.load(other_issuer) is None  # issuer stays inside the record and is verified
+    assert store.load(KEY) is not None
+    assert store.delete(RecordKey.local(KEY.resource, KEY.client_id)) is True
+    assert backend.items == {}
+    assert store.delete(RecordKey.local(KEY.resource, KEY.client_id)) is False

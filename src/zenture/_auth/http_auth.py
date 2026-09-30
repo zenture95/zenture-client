@@ -44,6 +44,7 @@ class SessionAuth(httpx2.Auth):
     async def async_auth_flow(
         self, request: httpx2.Request
     ) -> AsyncGenerator[httpx2.Request, httpx2.Response]:
+        self._core.require_resource(str(request.url))
         token = await asyncio.to_thread(self._core.access_token)
         self._bearer(request, token)
         response = yield request
@@ -59,6 +60,7 @@ class SessionAuth(httpx2.Auth):
     def sync_auth_flow(
         self, request: httpx2.Request
     ) -> Generator[httpx2.Request, httpx2.Response, None]:
+        self._core.require_resource(str(request.url))
         token = self._core.access_token()
         self._bearer(request, token)
         response = yield request

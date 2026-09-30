@@ -190,3 +190,20 @@ async def test_official_client_surfaces_auth_errors_unwrapped(
         caught = exc
 
     assert isinstance(caught, expected)
+
+
+@pytest.mark.asyncio
+async def test_caller_exception_inside_the_async_context_arrives_unwrapped(
+    env: Environment, lock_dir: Path
+) -> None:
+    session = _session(env, lock_dir)
+    caught: Any = None
+
+    try:
+        async with AsyncMcpClient.connect(env.endpoint, session=session) as client:
+            await client.list_tools()
+            raise KeyError("caller-error")
+    except BaseException as exc:
+        caught = exc
+
+    assert type(caught) is KeyError

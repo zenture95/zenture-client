@@ -6,14 +6,17 @@ import asyncio
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Literal
 
+from zenture._auth import login as login_module
 from zenture._auth.errors import (
     AuthorizationRequired,
     AuthUnavailable,
     PermissionDenied,
     SecureStoreUnavailable,
 )
+from zenture._auth.lock import binding_lock
 from zenture._auth.login import LoginFlow, Prepared, Runtime
-from zenture._auth.store import StoredRecord, StoreError
+from zenture._auth.model import CLIENT_ID, Target
+from zenture._auth.store import RecordKey, StoredRecord, StoreError
 from zenture.errors import ZentureMCPError
 
 if TYPE_CHECKING:
@@ -61,15 +64,17 @@ def open_stored_session(endpoint: str | None, runtime: Runtime | None = None) ->
 def clear_stored(endpoint: str | None, runtime: Runtime | None = None) -> bool:
     """Delete only the local record; return whether one existed."""
 
-    prepared = LoginFlow(runtime).prepare(session_only=False, endpoint=endpoint)
-    identity = prepared.core.identity
+    # Local removal is always possible: no discovery, no network, no issuer needed.
+    chosen = runtime or login_module.default_runtime()
+    identity = RecordKey.local(Target.from_endpoint(endpoint).resource, CLIENT_ID)
+    store = chosen.native_store()
     try:
-        with prepared.lock(identity):
-            existed = prepared.store.load(identity) is not None
-            prepared.store.delete(identity)
+        with binding_lock(
+            identity, directory=chosen.lock_directory, wait_seconds=chosen.lock_wait_seconds
+        ):
+            return store.delete(identity)
     except StoreError as exc:
         raise SecureStoreUnavailable from exc
-    return existed
 
 
 def check_status(endpoint: str | None, runtime: Runtime | None = None) -> StatusReport:

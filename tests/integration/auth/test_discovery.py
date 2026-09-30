@@ -24,6 +24,8 @@ BREAKS: list[tuple[str, dict[str, Any], dict[str, Any]]] = [
     ("no_s256", {}, {"code_challenge_methods_supported": ["plain"]}),
     ("iss_flag_false", {}, {"authorization_response_iss_parameter_supported": False}),
     ("iss_flag_missing", {}, {"authorization_response_iss_parameter_supported": None}),
+    ("non_loopback_http_issuer", {"authorization_servers": ["http://issuer.example"]}, {}),
+    ("foreign_jwks_uri", {}, {"jwks_uri": "http://127.0.0.1:1/jwks"}),
     ("foreign_token_endpoint", {}, {"token_endpoint": "http://127.0.0.1:1/token"}),
 ]
 

@@ -29,6 +29,7 @@ def test_base_dependencies_carry_the_native_auth_stack() -> None:
 
     assert {
         "httpx>=0.27,<1",
+        "httpx2>=2.5,<3",
         "pydantic>=2.7,<3",
         "mcp>=2.0.0,<2.1",
         "keyring>=25.6,<26",

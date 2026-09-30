@@ -26,7 +26,7 @@ if TYPE_CHECKING:
 CALLBACK_PATH = "/oauth/callback"
 LOGIN_TIMEOUT_SECONDS = 600.0
 _MAX_REQUEST_BYTES = 16 * 1024
-_CONNECTION_READ_SECONDS = 2.0
+_CONNECTION_READ_SECONDS = 0.5
 _SLICE_SECONDS = 0.2
 _PAGE = (
     b"<!doctype html><html lang=en><meta charset=utf-8><title>zenture</title>"
@@ -219,5 +219,5 @@ def _finish(
     if code is None:
         _respond(connection, "400 Bad Request", "Authorization response rejected.")
         raise AuthUnavailable("authorization_response_invalid")
-    _respond(connection, "200 OK", "zenture is connected. You can close this tab.")
+    _respond(connection, "200 OK", "Authorization received. Return to your terminal.")
     return CallbackResult(code=code, redirect_uri=redirect_uri, verifier=verifier)

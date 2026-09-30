@@ -509,6 +509,12 @@ class AsyncMcpClient:
         With neither ``session`` nor ``bearer_token`` the stored authorization
         of the endpoint is used; this never starts a login and raises
         ``AuthorizationRequired`` when no authorization is stored.
+
+        An exception raised by the caller inside the ``async with`` body is
+        handed back as raised even though the official client runs in task
+        groups. Only when another failure of the connection happens at the same
+        time can the caller see a ``BaseExceptionGroup`` (catch it with
+        ``except*``).
         """
 
         from zenture._auth.model import DEFAULT_ENDPOINT

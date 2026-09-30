@@ -40,5 +40,7 @@ class FileStore:
         temporary.write_text(record.to_json(), encoding="utf-8")
         temporary.replace(self.path)
 
-    def delete(self, identity: RecordKey) -> None:
+    def delete(self, identity: RecordKey) -> bool:
+        existed = self.path.exists()
         self.path.unlink(missing_ok=True)
+        return existed

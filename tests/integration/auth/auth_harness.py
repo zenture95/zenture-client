@@ -66,6 +66,8 @@ class FakeIssuer:
     omit_refresh_token: bool = False
     access_audience: str | None = None
     access_client_id: str = CLIENT_ID
+    forge_access: Callable[[FakeIssuer, dict[str, Any]], str] | None = None
+    next_connection_ids: list[str] = field(default_factory=list)
     refresh_behaviors: list[str] = field(default_factory=list)
     refresh_hold: threading.Event = field(default_factory=threading.Event)
     refresh_seen: threading.Event = field(default_factory=threading.Event)
@@ -183,6 +185,8 @@ class FakeIssuer:
             "exp": now + self.access_ttl,
             "jti": secrets.token_hex(8),
         }
+        if self.forge_access is not None:
+            return self.forge_access(self, claims)
         token = jwt.encode(claims, self._key, algorithm="ES256", headers={"kid": self.kid})
         with self._lock:
             self._access[token] = float(now + self.access_ttl)
@@ -342,7 +346,7 @@ class FakeIssuer:
         grant = IssuedGrant(
             grant_id=secrets.token_hex(6),
             sub="user-1",
-            connection_id="conn-1",
+            connection_id=self.next_connection_ids.pop(0) if self.next_connection_ids else "conn-1",
             owner_epoch=3,
             generation=7,
         )

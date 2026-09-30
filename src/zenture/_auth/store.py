@@ -39,8 +39,19 @@ class RecordKey:
     resource: str
     client_id: str
 
+    @classmethod
+    def local(cls, resource: str, client_id: str) -> RecordKey:
+        """Key for operations that need no issuer (lock, delete); never verifies a record."""
+
+        return cls("", resource, client_id)
+
     def digest(self) -> str:
-        material = "\n".join((self.issuer, self.resource, self.client_id)).encode()
+        """Item name: resource and client only, so local removal needs no discovery.
+
+        The issuer stays inside the record and is verified on every load.
+        """
+
+        material = "\n".join((self.resource, self.client_id)).encode()
         return hashlib.sha256(material).hexdigest()[:40]
 
 
@@ -124,7 +135,9 @@ class RecordStore(Protocol):
 
     def save(self, record: StoredRecord) -> None: ...
 
-    def delete(self, identity: RecordKey) -> None: ...
+    def delete(self, identity: RecordKey) -> bool:
+        """Remove the record; return whether one existed."""
+        ...
 
 
 class MemoryStore:
@@ -143,9 +156,12 @@ class MemoryStore:
         with self._guard:
             self._records[record.identity] = record
 
-    def delete(self, identity: RecordKey) -> None:
+    def delete(self, identity: RecordKey) -> bool:
         with self._guard:
-            self._records.pop(identity, None)
+            doomed = [key for key in self._records if key.digest() == identity.digest()]
+            for key in doomed:
+                del self._records[key]
+            return bool(doomed)
 
 
 class KeyringStore:
@@ -170,17 +186,25 @@ class KeyringStore:
         except Exception as exc:
             raise StoreError from exc
 
-    def delete(self, identity: RecordKey) -> None:
+    def delete(self, identity: RecordKey) -> bool:
+        name = identity.digest()
         try:
-            self._backend.delete_password(SERVICE_NAME, identity.digest())
+            existed = self._backend.get_password(SERVICE_NAME, name) is not None
         except Exception as exc:
-            # An item that is already gone is the desired end state.
+            raise StoreError from exc
+        if not existed:
+            return False
+        try:
+            self._backend.delete_password(SERVICE_NAME, name)
+        except Exception as exc:
+            # An item that vanished in between is the desired end state.
             try:
-                gone = self._backend.get_password(SERVICE_NAME, identity.digest()) is None
+                gone = self._backend.get_password(SERVICE_NAME, name) is None
             except Exception:
                 gone = False
             if not gone:
                 raise StoreError from exc
+        return True
 
 
 def native_backend(platform: str | None = None) -> Any:

@@ -13,7 +13,7 @@ import httpx
 
 from zenture._auth.errors import AuthorizationRequired, AuthUnavailable
 from zenture._auth.http import PRE_SEND_ERRORS, JsonResponse, new_client, request_json
-from zenture._auth.model import CLIENT_ID, Binding
+from zenture._auth.model import CLIENT_ID, Binding, within_resource
 from zenture._auth.store import RecordKey, RecordStore, StoredRecord, StoreError
 from zenture._auth.tokens import KeyCache, TokenRejected, TokenSet, parse_token_response
 
@@ -54,6 +54,12 @@ class SessionCore:
     @property
     def identity(self) -> RecordKey:
         return RecordKey(self.discovery.issuer, self.discovery.resource, CLIENT_ID)
+
+    def require_resource(self, url: str) -> None:
+        """Refuse any request target outside the discovered resource (before a token exists)."""
+
+        if not within_resource(url, self.discovery.resource):
+            raise AuthUnavailable("resource_mismatch", next_action="check_endpoint")
 
     def adopt(self, tokens: TokenSet) -> None:
         """Take over tokens of a fresh login (record already persisted by the caller)."""

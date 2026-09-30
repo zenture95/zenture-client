@@ -73,14 +73,23 @@ def binding_lock(
 ) -> contextlib.AbstractContextManager[None]:
     """Hold the exclusive lock of one record for the duration of a rotation."""
 
-    return _held(identity, directory or default_lock_directory(), wait_seconds)
+    chosen = directory or default_lock_directory()
+    # The default layout is ``<cache>/zenture/locks``: both levels are private.
+    return _held(identity, chosen, chosen.parent if directory is None else chosen, wait_seconds)
 
 
 @contextlib.contextmanager
-def _held(identity: RecordKey, directory: Path, wait_seconds: float) -> Iterator[None]:
+def _held(
+    identity: RecordKey, directory: Path, private_root: Path, wait_seconds: float
+) -> Iterator[None]:
+    flags = os.O_RDWR | os.O_CREAT | getattr(os, "O_NOFOLLOW", 0)
     try:
+        private_root.mkdir(mode=0o700, parents=True, exist_ok=True)
         directory.mkdir(mode=0o700, parents=True, exist_ok=True)
-        fd = os.open(directory / f"{identity.digest()}.lock", os.O_RDWR | os.O_CREAT, 0o600)
+        if sys.platform != "win32":
+            private_root.chmod(0o700)
+            directory.chmod(0o700)
+        fd = os.open(directory / f"{identity.digest()}.lock", flags, 0o600)
     except OSError as exc:
         raise AuthUnavailable("lock_unavailable") from exc
     try:

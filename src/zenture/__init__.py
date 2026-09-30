@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from zenture._version import __version__
-from zenture.async_client import AsyncZenture
-from zenture.client import Zenture
+from zenture.async_client import AsyncZentureClient
+from zenture.client import ZentureClient
 
-__all__ = ("AsyncZenture", "Zenture", "__version__")
+__all__ = ("AsyncZentureClient", "ZentureClient", "__version__")

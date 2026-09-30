@@ -6,7 +6,7 @@ import os
 
 import pytest
 
-from zenture import AsyncZenture
+from zenture import AsyncZentureClient
 from zenture._contract import PublicRunEvent, PublicRunStreamMessage, RunStatus
 from zenture._mcp import AsyncMcpClient
 
@@ -52,7 +52,9 @@ async def _cancel_if_active(client: AsyncMcpClient, run_id: str) -> None:
             pytest.fail("cleanup could not cancel a tracked Run")
 
 
-async def _stream_run_events(client: AsyncZenture, run_id: str) -> list[PublicRunStreamMessage]:
+async def _stream_run_events(
+    client: AsyncZentureClient, run_id: str
+) -> list[PublicRunStreamMessage]:
     return [
         message
         async for message in client.runs.iter_events(
@@ -73,7 +75,7 @@ async def test_real_mcp_and_api_clients_complete_both_cross_channel_journeys() -
     run_ids: list[str] = []
 
     async with (
-        AsyncZenture.from_env() as api,
+        AsyncZentureClient.from_env() as api,
         AsyncMcpClient.connect(
             MCP_INT_ENDPOINT,
             bearer_token=_mcp_access_token,

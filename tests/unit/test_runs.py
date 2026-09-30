@@ -10,11 +10,12 @@ import time
 from functools import partial
 from types import SimpleNamespace
 from typing import TYPE_CHECKING, Any, cast
+from uuid import UUID
 
 import httpx
 import pytest
 
-from zenture import AsyncZenture, Zenture
+from zenture import AsyncZentureClient, ZentureClient
 from zenture._contract import PublicRunEvent, PublicRunHeartbeat, PublicRunResponse
 from zenture._contract.run_references import validate_run_cursor
 from zenture._resources.runs import RunEventStreamState
@@ -28,7 +29,8 @@ from zenture.errors import (
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator, Iterator
 
-API_KEY = "zt_live_runs_test_abcdefghijklmnopqrstuvwxyz0123456789"
+# Deterministic synthetic fixture for MockTransport-only tests; no real credentials/network.
+API_KEY = f"zt_live_{UUID(int=0).hex}"
 RUN_ID = "run_33333333333343338333333333333333"
 PROPOSAL_ID = "33333333-3333-4333-8333-333333333333"
 MAX_STREAM_EVENT_BYTES = 512 * 1024
@@ -142,7 +144,7 @@ def test_sync_run_list_forwards_success_filter_and_reads_success_status(status: 
             },
         )
 
-    client = Zenture(
+    client = ZentureClient(
         api_key=API_KEY,
         http_client=httpx.Client(transport=httpx.MockTransport(handler)),
     )
@@ -273,7 +275,7 @@ def test_sync_iter_events_reconnects_deduplicates_and_stops_at_terminal() -> Non
         requests.append(request)
         return responses[min(len(responses) - 1, len(requests) - 1)]
 
-    client = Zenture(
+    client = ZentureClient(
         api_key=API_KEY,
         http_client=httpx.Client(transport=httpx.MockTransport(handler)),
     )
@@ -305,7 +307,7 @@ def test_sync_iter_events_stops_immediately_at_lifecycle_terminal(status: str) -
             )
         )
 
-    client = Zenture(
+    client = ZentureClient(
         api_key=API_KEY,
         http_client=httpx.Client(transport=httpx.MockTransport(handler)),
     )
@@ -331,7 +333,7 @@ def test_sync_iter_events_keeps_cancel_requested_nonterminal() -> None:
             )
         )
 
-    client = Zenture(
+    client = ZentureClient(
         api_key=API_KEY,
         http_client=httpx.Client(transport=httpx.MockTransport(handler)),
     )
@@ -343,7 +345,7 @@ def test_sync_iter_events_keeps_cancel_requested_nonterminal() -> None:
 
 
 def test_sync_iter_events_rejects_oversized_record_before_json_decoding() -> None:
-    client = Zenture(
+    client = ZentureClient(
         api_key=API_KEY,
         http_client=httpx.Client(
             transport=httpx.MockTransport(
@@ -359,7 +361,7 @@ def test_sync_iter_events_rejects_oversized_record_before_json_decoding() -> Non
 
 @pytest.mark.parametrize("message_type", ["run.event", "run.heartbeat", "run.error"])
 def test_sync_iter_events_rejects_a_foreign_run_message(message_type: str) -> None:
-    client = Zenture(
+    client = ZentureClient(
         api_key=API_KEY,
         http_client=httpx.Client(
             transport=httpx.MockTransport(
@@ -391,7 +393,7 @@ def test_sync_replay_rejects_an_event_for_a_foreign_run() -> None:
         "has_more": False,
         "next_cursor": None,
     }
-    client = Zenture(
+    client = ZentureClient(
         api_key=API_KEY,
         http_client=httpx.Client(
             transport=httpx.MockTransport(lambda _request: httpx.Response(200, json=payload))
@@ -423,7 +425,7 @@ def test_sync_run_cursor_is_rejected_before_query_or_header_forwarding(cursor: o
         requests.append(request)
         return httpx.Response(500)
 
-    client = Zenture(
+    client = ZentureClient(
         api_key=API_KEY,
         http_client=httpx.Client(transport=httpx.MockTransport(handler)),
     )
@@ -466,7 +468,7 @@ async def test_async_run_cursor_is_rejected_before_query_or_header_forwarding(
         requests.append(request)
         return httpx.Response(500)
 
-    client = AsyncZenture(
+    client = AsyncZentureClient(
         api_key=API_KEY,
         http_client=httpx.AsyncClient(transport=httpx.MockTransport(handler)),
     )
@@ -496,7 +498,7 @@ async def test_async_iter_events_reconnects_deduplicates_and_stops_at_terminal()
         requests.append(request)
         return responses[min(len(responses) - 1, len(requests) - 1)]
 
-    client = AsyncZenture(
+    client = AsyncZentureClient(
         api_key=API_KEY,
         http_client=httpx.AsyncClient(transport=httpx.MockTransport(handler)),
     )
@@ -518,7 +520,7 @@ async def test_async_iter_events_reconnects_deduplicates_and_stops_at_terminal()
 
 @pytest.mark.asyncio
 async def test_async_iter_events_rejects_oversized_record_before_json_decoding() -> None:
-    client = AsyncZenture(
+    client = AsyncZentureClient(
         api_key=API_KEY,
         http_client=httpx.AsyncClient(
             transport=httpx.MockTransport(
@@ -540,7 +542,7 @@ async def test_async_iter_events_rejects_oversized_record_before_json_decoding()
 @pytest.mark.asyncio
 @pytest.mark.parametrize("message_type", ["run.event", "run.heartbeat", "run.error"])
 async def test_async_iter_events_rejects_a_foreign_run_message(message_type: str) -> None:
-    client = AsyncZenture(
+    client = AsyncZentureClient(
         api_key=API_KEY,
         http_client=httpx.AsyncClient(
             transport=httpx.MockTransport(
@@ -578,7 +580,7 @@ async def test_async_replay_rejects_an_event_for_a_foreign_run() -> None:
         "has_more": False,
         "next_cursor": None,
     }
-    client = AsyncZenture(
+    client = AsyncZentureClient(
         api_key=API_KEY,
         http_client=httpx.AsyncClient(
             transport=httpx.MockTransport(lambda _request: httpx.Response(200, json=payload))
@@ -607,7 +609,7 @@ def test_sync_iter_events_reconnects_after_retryable_transport_error() -> None:
             )
         )
 
-    client = Zenture(
+    client = ZentureClient(
         api_key=API_KEY,
         http_client=httpx.Client(transport=httpx.MockTransport(handler)),
     )
@@ -636,7 +638,7 @@ async def test_async_iter_events_reconnects_after_retryable_transport_error() ->
             )
         )
 
-    client = AsyncZenture(
+    client = AsyncZentureClient(
         api_key=API_KEY,
         http_client=httpx.AsyncClient(transport=httpx.MockTransport(handler)),
     )
@@ -662,7 +664,7 @@ async def test_async_iter_events_reconnects_after_retryable_transport_error() ->
 def test_sync_iter_events_rejects_invalid_wait_parameters(
     timeout: float | None, initial_interval: float, max_interval: float
 ) -> None:
-    client = Zenture(
+    client = ZentureClient(
         api_key=API_KEY,
         http_client=httpx.Client(
             transport=httpx.MockTransport(lambda _request: _stream_response(b""))
@@ -696,7 +698,7 @@ async def test_async_iter_events_rejects_invalid_wait_parameters(
     async def handler(_request: httpx.Request) -> httpx.Response:
         return _stream_response(b"")
 
-    client = AsyncZenture(
+    client = AsyncZentureClient(
         api_key=API_KEY,
         http_client=httpx.AsyncClient(transport=httpx.MockTransport(handler)),
     )
@@ -749,7 +751,7 @@ def test_sync_iter_events_applies_bounded_reconnect_jitter(
             )
         )
 
-    client = Zenture(
+    client = ZentureClient(
         api_key=API_KEY,
         http_client=httpx.Client(transport=httpx.MockTransport(handler)),
     )
@@ -799,7 +801,7 @@ async def test_async_iter_events_applies_bounded_reconnect_jitter(
             )
         )
 
-    client = AsyncZenture(
+    client = AsyncZentureClient(
         api_key=API_KEY,
         http_client=httpx.AsyncClient(transport=httpx.MockTransport(handler)),
     )
@@ -835,7 +837,7 @@ def test_sync_iter_events_stops_on_caller_stop() -> None:
         stop_calls += 1
         return stop_calls > 1
 
-    client = Zenture(
+    client = ZentureClient(
         api_key=API_KEY,
         http_client=httpx.Client(transport=httpx.MockTransport(handler)),
     )
@@ -861,7 +863,7 @@ async def test_async_iter_events_stops_on_caller_timeout() -> None:
             )
         )
 
-    client = AsyncZenture(
+    client = AsyncZentureClient(
         api_key=API_KEY,
         http_client=httpx.AsyncClient(transport=httpx.MockTransport(handler)),
     )
@@ -891,7 +893,7 @@ def test_sync_iter_events_bounds_cursor_cycles() -> None:
             )
         )
 
-    client = Zenture(
+    client = ZentureClient(
         api_key=API_KEY,
         http_client=httpx.Client(transport=httpx.MockTransport(handler)),
     )
@@ -917,7 +919,7 @@ async def test_async_iter_events_bounds_cursor_cycles() -> None:
             )
         )
 
-    client = AsyncZenture(
+    client = AsyncZentureClient(
         api_key=API_KEY,
         http_client=httpx.AsyncClient(transport=httpx.MockTransport(handler)),
     )
@@ -954,7 +956,7 @@ def test_sync_attach_artifact_streams_iterable_with_declared_size_and_hash() -> 
         assert request.read() == content
         return _artifact_response(content)
 
-    client = Zenture(
+    client = ZentureClient(
         api_key=API_KEY,
         http_client=httpx.Client(transport=httpx.MockTransport(handler)),
     )
@@ -985,7 +987,7 @@ async def test_async_attach_artifact_streams_async_iterable_with_declared_size_a
         assert await request.aread() == content
         return _artifact_response(content)
 
-    client = AsyncZenture(
+    client = AsyncZentureClient(
         api_key=API_KEY,
         http_client=httpx.AsyncClient(transport=httpx.MockTransport(handler)),
     )
@@ -1011,7 +1013,7 @@ def test_sync_attach_artifact_streams_file_without_closing_caller_source() -> No
         assert request.read() == content
         return _artifact_response(content)
 
-    client = Zenture(
+    client = ZentureClient(
         api_key=API_KEY,
         http_client=httpx.Client(transport=httpx.MockTransport(handler)),
     )
@@ -1039,7 +1041,7 @@ async def test_async_attach_artifact_streams_file_without_closing_caller_source(
         assert await request.aread() == content
         return _artifact_response(content)
 
-    client = AsyncZenture(
+    client = AsyncZentureClient(
         api_key=API_KEY,
         http_client=httpx.AsyncClient(transport=httpx.MockTransport(handler)),
     )
@@ -1065,7 +1067,7 @@ def test_sync_attach_artifact_rejects_size_overrun_and_hash_mismatch() -> None:
         request.read()
         return _artifact_response(content)
 
-    client = Zenture(
+    client = ZentureClient(
         api_key=API_KEY,
         http_client=httpx.Client(transport=httpx.MockTransport(handler)),
     )
@@ -1108,7 +1110,7 @@ async def test_async_attach_artifact_rejects_size_overrun_and_hash_mismatch() ->
         await request.aread()
         return _artifact_response(content)
 
-    client = AsyncZenture(
+    client = AsyncZentureClient(
         api_key=API_KEY,
         http_client=httpx.AsyncClient(transport=httpx.MockTransport(handler)),
     )
@@ -1143,7 +1145,7 @@ def test_sync_attach_artifact_rejects_stream_without_declared_size() -> None:
         requests.append(request)
         return _artifact_response(b"bytes")
 
-    client = Zenture(
+    client = ZentureClient(
         api_key=API_KEY,
         http_client=httpx.Client(transport=httpx.MockTransport(handler)),
     )
@@ -1172,7 +1174,7 @@ async def test_async_attach_artifact_rejects_stream_without_declared_size() -> N
         requests.append(request)
         return _artifact_response(b"bytes")
 
-    client = AsyncZenture(
+    client = AsyncZentureClient(
         api_key=API_KEY,
         http_client=httpx.AsyncClient(transport=httpx.MockTransport(handler)),
     )
@@ -1195,7 +1197,7 @@ def test_sync_attach_artifact_rejects_non_bytes_chunk() -> None:
         request.read()
         return _artifact_response(b"bytes")
 
-    client = Zenture(
+    client = ZentureClient(
         api_key=API_KEY,
         http_client=httpx.Client(transport=httpx.MockTransport(handler)),
     )
@@ -1223,7 +1225,7 @@ async def test_async_attach_artifact_rejects_non_bytes_chunk() -> None:
         await request.aread()
         return _artifact_response(b"bytes")
 
-    client = AsyncZenture(
+    client = AsyncZentureClient(
         api_key=API_KEY,
         http_client=httpx.AsyncClient(transport=httpx.MockTransport(handler)),
     )
@@ -1251,7 +1253,7 @@ def test_sync_attach_artifact_does_not_retry_one_shot_file() -> None:
         attempts += 1
         raise httpx.ReadError("upload connection reset")
 
-    client = Zenture(
+    client = ZentureClient(
         api_key=API_KEY,
         max_retries=2,
         http_client=httpx.Client(transport=httpx.MockTransport(handler)),
@@ -1283,7 +1285,7 @@ async def test_async_attach_artifact_does_not_retry_one_shot_file() -> None:
         attempts += 1
         raise httpx.ReadError("upload connection reset")
 
-    client = AsyncZenture(
+    client = AsyncZentureClient(
         api_key=API_KEY,
         max_retries=2,
         http_client=httpx.AsyncClient(transport=httpx.MockTransport(handler)),
@@ -1316,7 +1318,7 @@ def test_sync_attach_artifact_retries_replayable_bytes() -> None:
         assert request.read() == content
         return _artifact_response(content)
 
-    client = Zenture(
+    client = ZentureClient(
         api_key=API_KEY,
         max_retries=1,
         initial_retry_backoff=0.0,
@@ -1350,7 +1352,7 @@ async def test_async_attach_artifact_retries_replayable_bytes() -> None:
         assert await request.aread() == content
         return _artifact_response(content)
 
-    client = AsyncZenture(
+    client = AsyncZentureClient(
         api_key=API_KEY,
         max_retries=1,
         initial_retry_backoff=0.0,
@@ -1380,7 +1382,7 @@ def test_sync_wait_returns_when_queued_run_reaches_completed() -> None:
         seen.append(request)
         return httpx.Response(200, json=responses[min(len(responses) - 1, len(seen) - 1)])
 
-    client = Zenture(
+    client = ZentureClient(
         api_key=API_KEY,
         http_client=httpx.Client(transport=httpx.MockTransport(handler)),
     )
@@ -1427,7 +1429,7 @@ def test_sync_wait_uses_first_server_deadline_once_and_reports_context_on_timeou
         calls += 1
         return httpx.Response(200, json=response)
 
-    client = Zenture(
+    client = ZentureClient(
         api_key=API_KEY,
         http_client=httpx.Client(transport=httpx.MockTransport(handler)),
     )
@@ -1449,7 +1451,7 @@ def test_sync_wait_explicit_timeout_wins_over_server_deadline() -> None:
     def handler(_request: httpx.Request) -> httpx.Response:
         return httpx.Response(200, json=responses[0])
 
-    client = Zenture(
+    client = ZentureClient(
         api_key=API_KEY,
         http_client=httpx.Client(transport=httpx.MockTransport(handler)),
     )
@@ -1478,7 +1480,7 @@ def test_sync_wait_reports_deadline_when_terminal_response_crosses_explicit_time
         now += 0.6
         return httpx.Response(200, json=_run(status="completed", deadline_at=deadline_at))
 
-    client = Zenture(
+    client = ZentureClient(
         api_key=API_KEY,
         http_client=httpx.Client(transport=httpx.MockTransport(handler)),
     )
@@ -1497,7 +1499,7 @@ def test_sync_wait_passes_remaining_budget_to_each_run_request() -> None:
         read_timeouts.append(request.extensions["timeout"]["read"])
         return httpx.Response(200, json=_run(status="completed"))
 
-    client = Zenture(
+    client = ZentureClient(
         api_key=API_KEY,
         http_client=httpx.Client(transport=httpx.MockTransport(handler)),
     )
@@ -1537,7 +1539,7 @@ def test_sync_wait_does_not_extend_for_a_deadline_already_past(
         calls += 1
         return httpx.Response(200, json=_run(deadline_at="1970-01-01T00:15:00Z"))
 
-    client = Zenture(
+    client = ZentureClient(
         api_key=API_KEY,
         http_client=httpx.Client(transport=httpx.MockTransport(handler)),
     )
@@ -1554,7 +1556,7 @@ def test_sync_wait_honors_stop_after_an_inflight_response() -> None:
     def handler(_request: httpx.Request) -> httpx.Response:
         return httpx.Response(200, json=_run(status="completed"))
 
-    client = Zenture(
+    client = ZentureClient(
         api_key=API_KEY,
         http_client=httpx.Client(transport=httpx.MockTransport(handler)),
     )
@@ -1592,7 +1594,7 @@ def test_sync_wait_null_deadline_keeps_the_existing_finite_default(
         calls += 1
         return httpx.Response(200, json=_run())
 
-    client = Zenture(
+    client = ZentureClient(
         api_key=API_KEY,
         http_client=httpx.Client(transport=httpx.MockTransport(handler)),
     )
@@ -1619,7 +1621,7 @@ def test_sync_wait_rejects_a_changed_server_deadline() -> None:
         calls += 1
         return httpx.Response(200, json=response)
 
-    client = Zenture(
+    client = ZentureClient(
         api_key=API_KEY,
         http_client=httpx.Client(transport=httpx.MockTransport(handler)),
     )
@@ -1657,7 +1659,7 @@ async def test_async_wait_uses_finite_default_for_null_deadline(
         calls += 1
         return httpx.Response(200, json=_run())
 
-    client = AsyncZenture(
+    client = AsyncZentureClient(
         api_key=API_KEY,
         http_client=httpx.AsyncClient(transport=httpx.MockTransport(handler)),
     )
@@ -1678,7 +1680,7 @@ async def test_async_wait_honors_stop_after_an_inflight_response() -> None:
     async def handler(_request: httpx.Request) -> httpx.Response:
         return httpx.Response(200, json=_run(status="completed"))
 
-    client = AsyncZenture(
+    client = AsyncZentureClient(
         api_key=API_KEY,
         http_client=httpx.AsyncClient(transport=httpx.MockTransport(handler)),
     )
@@ -1715,7 +1717,7 @@ async def test_async_wait_explicit_timeout_wins_over_a_server_deadline(
         calls += 1
         return httpx.Response(200, json=_run(deadline_at="1970-01-01T00:33:20Z"))
 
-    client = AsyncZenture(
+    client = AsyncZentureClient(
         api_key=API_KEY,
         http_client=httpx.AsyncClient(transport=httpx.MockTransport(handler)),
     )
@@ -1747,7 +1749,7 @@ async def test_async_wait_reports_deadline_when_terminal_response_crosses_explic
         now += 0.6
         return httpx.Response(200, json=_run(status="completed", deadline_at=deadline_at))
 
-    client = AsyncZenture(
+    client = AsyncZentureClient(
         api_key=API_KEY,
         http_client=httpx.AsyncClient(transport=httpx.MockTransport(handler)),
     )
@@ -1786,7 +1788,7 @@ async def test_async_wait_uses_the_first_non_null_deadline_once(
         calls += 1
         return httpx.Response(200, json=_run(deadline_at="1970-01-01T00:16:21Z"))
 
-    client = AsyncZenture(
+    client = AsyncZentureClient(
         api_key=API_KEY,
         http_client=httpx.AsyncClient(transport=httpx.MockTransport(handler)),
     )
@@ -1824,7 +1826,7 @@ async def test_async_wait_past_deadline_cannot_extend_polling(
         calls += 1
         return httpx.Response(200, json=_run(deadline_at="1970-01-01T00:15:00Z"))
 
-    client = AsyncZenture(
+    client = AsyncZentureClient(
         api_key=API_KEY,
         http_client=httpx.AsyncClient(transport=httpx.MockTransport(handler)),
     )
@@ -1849,7 +1851,7 @@ async def test_async_wait_rejects_a_changed_server_deadline() -> None:
         calls += 1
         return httpx.Response(200, json=response)
 
-    client = AsyncZenture(
+    client = AsyncZentureClient(
         api_key=API_KEY,
         http_client=httpx.AsyncClient(transport=httpx.MockTransport(handler)),
     )
@@ -1868,7 +1870,7 @@ async def test_async_wait_passes_remaining_budget_to_each_run_request() -> None:
         read_timeouts.append(request.extensions["timeout"]["read"])
         return httpx.Response(200, json=_run(status="completed"))
 
-    client = AsyncZenture(
+    client = AsyncZentureClient(
         api_key=API_KEY,
         http_client=httpx.AsyncClient(transport=httpx.MockTransport(handler)),
     )
@@ -1883,7 +1885,7 @@ async def test_async_wait_passes_remaining_budget_to_each_run_request() -> None:
 @pytest.mark.parametrize("operation", ["get", "wait", "cancel", "record_outcome"])
 def test_sync_run_path_rejects_a_foreign_run_projection(operation: str) -> None:
     foreign_run_id = "run_aaaaaaaaaaaaaaaa"
-    client = Zenture(
+    client = ZentureClient(
         api_key=API_KEY,
         http_client=httpx.Client(
             transport=httpx.MockTransport(
@@ -1923,7 +1925,7 @@ async def test_async_wait_returns_when_queued_run_reaches_completed() -> None:
         seen.append(request)
         return httpx.Response(200, json=responses[min(len(responses) - 1, len(seen) - 1)])
 
-    client = AsyncZenture(
+    client = AsyncZentureClient(
         api_key=API_KEY,
         http_client=httpx.AsyncClient(transport=httpx.MockTransport(handler)),
     )
@@ -1943,7 +1945,7 @@ async def test_async_wait_returns_when_queued_run_reaches_completed() -> None:
 @pytest.mark.parametrize("operation", ["get", "wait", "cancel", "record_outcome"])
 async def test_async_run_path_rejects_a_foreign_run_projection(operation: str) -> None:
     foreign_run_id = "run_aaaaaaaaaaaaaaaa"
-    client = AsyncZenture(
+    client = AsyncZentureClient(
         api_key=API_KEY,
         http_client=httpx.AsyncClient(
             transport=httpx.MockTransport(
@@ -1984,7 +1986,7 @@ def test_sync_run_helper_preserves_idempotency_and_wait_hint() -> None:
         assert request.headers["prefer"] == "wait=15"
         return httpx.Response(202, json=_run())
 
-    client = Zenture(
+    client = ZentureClient(
         api_key=API_KEY,
         http_client=httpx.Client(transport=httpx.MockTransport(handler)),
     )
@@ -2007,7 +2009,7 @@ def test_run_outcome_uses_canonical_adjudications_and_edited_artifact() -> None:
         seen.append(request)
         return httpx.Response(200, json=_run(status="completed"))
 
-    client = Zenture(
+    client = ZentureClient(
         api_key=API_KEY,
         http_client=httpx.Client(transport=httpx.MockTransport(handler)),
     )
@@ -2028,7 +2030,7 @@ def test_run_outcome_uses_canonical_adjudications_and_edited_artifact() -> None:
 
 
 def test_run_resources_reject_non_canonical_run_references_before_network() -> None:
-    client = Zenture(
+    client = ZentureClient(
         api_key=API_KEY,
         http_client=httpx.Client(
             transport=httpx.MockTransport(
@@ -2050,7 +2052,7 @@ async def test_async_run_outcome_uses_canonical_adjudications_and_edited_artifac
         seen.append(request)
         return httpx.Response(200, json=_run(status="completed"))
 
-    client = AsyncZenture(
+    client = AsyncZentureClient(
         api_key=API_KEY,
         http_client=httpx.AsyncClient(transport=httpx.MockTransport(handler)),
     )
@@ -2083,7 +2085,7 @@ data: {\"type\":\"run.event\",\"event_id\":\"event_bbbbbbbb\",\"run_id\":\"run_3
         assert request.headers["accept"] == "text/event-stream"
         return httpx.Response(200, headers={"content-type": "text/event-stream"}, content=stream)
 
-    client = Zenture(
+    client = ZentureClient(
         api_key=API_KEY,
         http_client=httpx.Client(transport=httpx.MockTransport(handler)),
     )
@@ -2113,7 +2115,7 @@ def test_sync_attach_artifact_sends_bytes_with_upload_intent() -> None:
             },
         )
 
-    client = Zenture(
+    client = ZentureClient(
         api_key=API_KEY,
         http_client=httpx.Client(transport=httpx.MockTransport(handler)),
     )
@@ -2145,7 +2147,7 @@ def test_sync_signed_upload_omits_optional_upload_id() -> None:
             },
         )
 
-    client = Zenture(
+    client = ZentureClient(
         api_key=API_KEY,
         http_client=httpx.Client(transport=httpx.MockTransport(handler)),
     )
@@ -2177,7 +2179,7 @@ async def test_async_signed_upload_omits_optional_upload_id() -> None:
             },
         )
 
-    client = AsyncZenture(
+    client = AsyncZentureClient(
         api_key=API_KEY,
         http_client=httpx.AsyncClient(transport=httpx.MockTransport(handler)),
     )
@@ -2201,7 +2203,7 @@ async def test_async_run_resources_match_sync_event_surface() -> None:
         assert request.url.path.endswith("/events/stream")
         return httpx.Response(200, headers={"content-type": "text/event-stream"}, content=stream)
 
-    client = AsyncZenture(
+    client = AsyncZentureClient(
         api_key=API_KEY,
         http_client=httpx.AsyncClient(transport=httpx.MockTransport(handler)),
     )
@@ -2310,7 +2312,7 @@ def test_sync_iter_events_stops_before_reading_idle_stream() -> None:
         stop_calls += 1
         return stop_calls > 1
 
-    client = Zenture(
+    client = ZentureClient(
         api_key=API_KEY,
         http_client=httpx.Client(transport=httpx.MockTransport(handler)),
     )
@@ -2343,7 +2345,7 @@ async def test_async_iter_events_stops_before_reading_idle_stream() -> None:
         stop_calls += 1
         return stop_calls > 1
 
-    client = AsyncZenture(
+    client = AsyncZentureClient(
         api_key=API_KEY,
         http_client=httpx.AsyncClient(transport=httpx.MockTransport(handler)),
     )
@@ -2379,7 +2381,7 @@ def test_sync_iter_events_checks_timeout_after_heartbeat(
             stream=stream,
         )
 
-    client = Zenture(
+    client = ZentureClient(
         api_key=API_KEY,
         http_client=httpx.Client(transport=httpx.MockTransport(handler)),
     )
@@ -2412,7 +2414,7 @@ async def test_async_iter_events_checks_timeout_after_heartbeat(
             stream=stream,
         )
 
-    client = AsyncZenture(
+    client = AsyncZentureClient(
         api_key=API_KEY,
         http_client=httpx.AsyncClient(transport=httpx.MockTransport(handler)),
     )
@@ -2442,7 +2444,7 @@ async def test_async_iter_events_polls_stop_during_an_idle_stream() -> None:
         stop_calls += 1
         return stop_calls > 1
 
-    client = AsyncZenture(
+    client = AsyncZentureClient(
         api_key=API_KEY,
         http_client=httpx.AsyncClient(transport=httpx.MockTransport(handler)),
     )
@@ -2488,7 +2490,7 @@ async def test_async_iter_events_rechecks_absolute_deadline_after_idle_window(
             stream=_ImmediateAsyncStream(),
         )
 
-    client = AsyncZenture(
+    client = AsyncZentureClient(
         api_key=API_KEY,
         http_client=httpx.AsyncClient(transport=httpx.MockTransport(handler)),
     )
@@ -2531,7 +2533,7 @@ async def test_async_iter_events_rechecks_stop_after_explicit_deadline_idle_wind
         stop_calls += 1
         return stop_calls > 1
 
-    client = AsyncZenture(
+    client = AsyncZentureClient(
         api_key=API_KEY,
         http_client=httpx.AsyncClient(transport=httpx.MockTransport(handler)),
     )
@@ -2561,7 +2563,7 @@ async def test_async_iter_events_interrupts_open_idle_stream() -> None:
             stream=stream,
         )
 
-    client = AsyncZenture(
+    client = AsyncZentureClient(
         api_key=API_KEY,
         http_client=httpx.AsyncClient(transport=httpx.MockTransport(handler)),
     )
@@ -2586,7 +2588,7 @@ def test_sync_iter_events_passes_remaining_timeout_to_stream() -> None:
             )
         )
 
-    client = Zenture(
+    client = ZentureClient(
         api_key=API_KEY,
         http_client=httpx.Client(transport=httpx.MockTransport(handler)),
     )
@@ -2612,7 +2614,7 @@ def test_sync_iter_events_bounds_idle_read_and_closes_stream() -> None:
             stream=stream,
         )
 
-    client = Zenture(
+    client = ZentureClient(
         api_key=API_KEY,
         http_client=httpx.Client(transport=httpx.MockTransport(handler)),
     )
@@ -2660,7 +2662,7 @@ def test_sync_timeout_only_stream_uses_heartbeat_safe_checkpoint() -> None:
             )
         )
 
-    client = Zenture(
+    client = ZentureClient(
         api_key=API_KEY,
         http_client=httpx.Client(transport=httpx.MockTransport(handler)),
     )
@@ -2719,7 +2721,7 @@ def test_sync_timeout_only_stream_reconfigures_at_final_deadline_window(
             )
         )
 
-    client = Zenture(
+    client = ZentureClient(
         api_key=API_KEY,
         http_client=httpx.Client(transport=httpx.MockTransport(handler)),
     )
@@ -2753,7 +2755,7 @@ async def test_async_iter_events_passes_remaining_timeout_to_stream() -> None:
             )
         )
 
-    client = AsyncZenture(
+    client = AsyncZentureClient(
         api_key=API_KEY,
         http_client=httpx.AsyncClient(transport=httpx.MockTransport(handler)),
     )

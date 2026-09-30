@@ -4,14 +4,16 @@ from __future__ import annotations
 
 import asyncio
 import json
+from uuid import UUID
 
 import httpx
 import pytest
 
-from zenture import AsyncZenture, Zenture
+from zenture import AsyncZentureClient, ZentureClient
 from zenture.errors import ZentureAPIError
 
-API_KEY = "zt_live_sdk_start_parity_test"
+# Deterministic synthetic fixture for MockTransport-only tests; no real credentials/network.
+API_KEY = f"zt_live_{UUID(int=0).hex}"
 RUN_ID = "run_33333333333343338333333333333333"
 PROPOSAL_ID = "33333333-3333-4333-8333-333333333333"
 PROPOSAL_HASH = "b" * 64
@@ -85,7 +87,7 @@ def test_sync_run_forwards_inadmissible_prepare_to_start() -> None:
         _assert_start_request(request)
         return httpx.Response(202, json=_run())
 
-    client = Zenture(
+    client = ZentureClient(
         api_key=API_KEY,
         http_client=httpx.Client(transport=httpx.MockTransport(handler)),
         max_retries=0,
@@ -116,7 +118,7 @@ def test_sync_run_forwards_server_rejection_as_typed_api_error() -> None:
         _assert_start_request(request)
         return httpx.Response(409, json=_proposal_error())
 
-    client = Zenture(
+    client = ZentureClient(
         api_key=API_KEY,
         http_client=httpx.Client(transport=httpx.MockTransport(handler)),
         max_retries=0,
@@ -151,7 +153,7 @@ def test_async_run_forwards_inadmissible_prepare_to_start() -> None:
             _assert_start_request(request)
             return httpx.Response(202, json=_run())
 
-        client = AsyncZenture(
+        client = AsyncZentureClient(
             api_key=API_KEY,
             http_client=httpx.AsyncClient(transport=httpx.MockTransport(handler)),
             max_retries=0,
@@ -185,7 +187,7 @@ def test_async_run_forwards_server_rejection_as_typed_api_error() -> None:
             _assert_start_request(request)
             return httpx.Response(409, json=_proposal_error())
 
-        client = AsyncZenture(
+        client = AsyncZentureClient(
             api_key=API_KEY,
             http_client=httpx.AsyncClient(transport=httpx.MockTransport(handler)),
             max_retries=0,

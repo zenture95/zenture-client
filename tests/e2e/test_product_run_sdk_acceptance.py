@@ -7,7 +7,7 @@ from uuid import uuid4
 
 import pytest
 
-from zenture import AsyncZenture
+from zenture import AsyncZentureClient
 from zenture._contract import RunProfile, RunStatus
 from zenture.testing.product_runs import ProductRunFixture, run_product_e2e
 
@@ -49,7 +49,7 @@ async def test_product_run_sdk_acceptance(profile: RunProfile) -> None:
         profile=profile,
     )
 
-    async with AsyncZenture.from_env() as client:
+    async with AsyncZentureClient.from_env() as client:
         report = await run_product_e2e(
             client,
             fixture,

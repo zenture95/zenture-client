@@ -3,7 +3,7 @@ requires = ["hatchling>=1.26"]
 build-backend = "hatchling.build"
 
 [project]
-name = "zenture-sdk"
+name = "zenture"
 dynamic = ["version"]
 description = "Official Python SDK for the zenture Public API."
 readme = "README.md"
@@ -46,8 +46,8 @@ dev = [
 
 [project.urls]
 Homepage = "https://www.zenture.app/about"
-Repository = "https://github.com/zenture95/zenture-sdk"
-Issues = "https://github.com/zenture95/zenture-sdk/issues"
+Repository = "https://github.com/zenture95/zenture-client"
+Issues = "https://github.com/zenture95/zenture-client/issues"
 
 [tool.hatch.version]
 path = "src/zenture/_version.py"

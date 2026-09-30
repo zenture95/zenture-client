@@ -9,7 +9,7 @@ from decimal import Decimal
 from typing import Any
 from uuid import uuid4
 
-from zenture import Zenture
+from zenture import ZentureClient
 from zenture.idempotency import idempotency_key
 
 DEFAULT_PROMPT = "Explain why deterministic tests matter for an SDK."
@@ -19,7 +19,7 @@ def main() -> None:
     prompt = os.environ.get("ZENTURE_EXAMPLE_PROMPT", DEFAULT_PROMPT)
     run_id = os.environ.get("ZENTURE_EXAMPLE_RUN_ID") or f"local-e2e-{uuid4().hex}"
 
-    with Zenture.from_env() as client:
+    with ZentureClient.from_env() as client:
         wallet = client.wallet.get()
         single_models = client.models.list(mode="single").models
         selected_model = _select_single_model(single_models)

@@ -5,7 +5,7 @@ the zenture Public API.
 
 ## Repository Purpose
 
-`zenture-sdk` is the official server-side Python SDK and the implementation
+`zenture-client` is the official server-side Python SDK and the implementation
 home for the opt-in client-side MCP peer adapter. It is intended for backend
 services, workers, automation jobs, CI, evaluation pipelines, controlled
 notebooks and governed MCP-consuming clients. It is not for browsers, mobile
@@ -13,10 +13,10 @@ apps, or frontend bundles.
 
 Package names:
 
-- Distribution: `zenture-sdk`
+- Distribution: `zenture`
 - Import package: `zenture`
-- Sync client: `Zenture`
-- Async client: `AsyncZenture`
+- Sync client: `ZentureClient`
+- Async client: `AsyncZentureClient`
 
 Public product references:
 
@@ -45,11 +45,12 @@ Public product references:
 
 ## Public vs Internal Surface
 
-Only `Zenture`, `AsyncZenture`, and `__version__` are top-level public exports.
+Only `ZentureClient`, `AsyncZentureClient`, and `__version__` are top-level
+public exports.
 Do not export internal `_contract` models from `zenture.__init__`.
 
-The `_mcp` namespace is intentionally an opt-in implementation surface until
-the later atomic `zenture-client` cutover. Its bearer input is caller-provided;
+The `_mcp` namespace remains an opt-in implementation surface. Its bearer input
+is caller-provided;
 the SDK does not issue, refresh, revoke, persist or log MCP credentials.
 
 Resource methods such as `client.chat.run(...)`, `client.models.list(...)`, and
@@ -80,8 +81,7 @@ When adding or changing a resource:
 When a new Engine capability is intended for client consumption, extend this
 repository's canonical contract models and both peer surfaces: the API
 resource and the opt-in MCP adapter. Add sync/async parity and cross-channel
-acceptance tests here before any later `zenture-client` promotion; do not create
-a workspace-only client duplicate or move Engine/business authority into the
+acceptance tests here before release promotion; do not create a workspace-only client duplicate or move Engine/business authority into the
 SDK.
 
 ## Required Commands
@@ -118,8 +118,8 @@ New resources must include typed sync and async behavior, idempotency safety for
 mutating calls, no real network tests, and public-safe docs/examples when the
 usage surface changes.
 
-Examples must use `Zenture.from_env()` or `AsyncZenture.from_env()`. Mutating
-examples must pass explicit stable idempotency keys, preferably built with the
+Examples must use `ZentureClient.from_env()` or `AsyncZentureClient.from_env()`.
+Mutating examples must pass explicit stable idempotency keys, preferably built with the
 SDK helper. Do not create tracked `.env` files.
 
 ## Pull Request Rules

@@ -16,7 +16,7 @@ Install the optional integration dependency only for callers that need the
 official MCP transport:
 
 ```bash
-python -m pip install 'zenture-sdk[mcp]'
+python -m pip install 'zenture[mcp]'
 ```
 
 The API-only installation remains independent of the optional dependency. The
@@ -53,6 +53,6 @@ bounded and never auto-pages. Artifact bytes are not encoded into MCP JSON;
 the active host transport must provide the separately governed byte-source
 capability or the server returns `artifact_unavailable`.
 
-The `_mcp` namespace is an opt-in implementation surface during the current
-repository phase. Public `ZentureClient` naming and compatibility-package
-promotion remain part of the later atomic package cutover.
+The `_mcp` namespace remains an opt-in implementation surface. The package
+exports `ZentureClient` and `AsyncZentureClient` for API-token access; these
+classes do not perform OAuth or manage MCP credentials.

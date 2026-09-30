@@ -2,13 +2,13 @@
 
 from __future__ import annotations
 
-from zenture import Zenture
+from zenture import ZentureClient
 from zenture.idempotency import idempotency_key
 
 
 def main() -> None:
     key = idempotency_key("example", "chat-multi", "v1")
-    with Zenture.from_env() as client:
+    with ZentureClient.from_env() as client:
         available_models = [
             model.id for model in client.models.list(mode="multi").models if model.is_available
         ]

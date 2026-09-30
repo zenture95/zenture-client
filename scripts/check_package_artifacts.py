@@ -6,6 +6,7 @@ import argparse
 import re
 import tarfile
 import zipfile
+from email.parser import Parser
 from pathlib import Path
 
 FORBIDDEN_NAME_PARTS = (
@@ -101,10 +102,28 @@ def _has_prefix(names: set[str], prefix: str) -> bool:
     return any(name.startswith(prefix) for name in names)
 
 
+def _assert_metadata(data: bytes) -> None:
+    metadata = Parser().parsestr(data.decode("utf-8"))
+    if metadata["Name"] != "zenture":
+        raise SystemExit("Artifact distribution must be zenture.")
+    if not metadata["Version"]:
+        raise SystemExit("Artifact is missing its release version.")
+    urls = metadata.get_all("Project-URL", [])
+    if "Repository, https://github.com/zenture95/zenture-client" not in urls:
+        raise SystemExit("Artifact is missing the canonical repository URL.")
+    if "Issues, https://github.com/zenture95/zenture-client/issues" not in urls:
+        raise SystemExit("Artifact is missing the canonical issue URL.")
+
+
 def _assert_sdist(path: Path) -> None:
     names = _tar_names(path)
     _assert_no_forbidden_names(names, artifact="sdist")
     _assert_no_forbidden_text_in_tar(path)
+    with tarfile.open(path, "r:gz") as archive:
+        metadata = archive.extractfile(f"{path.name.removesuffix('.tar.gz')}/PKG-INFO")
+        if metadata is None:
+            raise SystemExit("sdist is missing PKG-INFO.")
+        _assert_metadata(metadata.read())
     required_suffixes = [
         "AGENTS.md",
         "README.md",
@@ -137,6 +156,11 @@ def _assert_wheel(path: Path) -> None:
     names = _zip_names(path)
     _assert_no_forbidden_names(names, artifact="wheel")
     _assert_no_forbidden_text_in_zip(path)
+    with zipfile.ZipFile(path) as archive:
+        metadata_names = [name for name in names if name.endswith(".dist-info/METADATA")]
+        if len(metadata_names) != 1:
+            raise SystemExit("wheel must contain exactly one METADATA file.")
+        _assert_metadata(archive.read(metadata_names[0]))
     required = [
         "zenture/__init__.py",
         "zenture/py.typed",

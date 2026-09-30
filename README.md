@@ -1,26 +1,38 @@
 <img src="https://ai.zenture.app/logo.svg" alt="zenture logo" width="180">
 
-# The official zenture-sdk
+# The official zenture Python client
 
 Official server-side only Python SDK for the zenture Public API.
 
-`zenture-sdk` is for backend services, automation jobs, evaluation pipelines,
+`zenture` is for backend services, automation jobs, evaluation pipelines,
 CI tasks, and controlled notebook environments. zenture API tokens are
 server-side credentials. Do not put them in browsers, mobile apps, frontend
 bundles, public notebooks, logs, analytics, traces, or customer-visible errors.
 
+## Source migration
+
+This is a hard source cutover: install `zenture` and import `ZentureClient` or
+`AsyncZentureClient` from `zenture`. Replace the former `Zenture` and
+`AsyncZenture` class names in application code; no legacy aliases are provided.
+The repository is `zenture95/zenture-client`. API-token access and the existing
+caller-provided bearer MCP adapter retain their behavior. OAuth discovery,
+login, refresh and credential storage are not implemented by this client.
+Previously published artifacts remain the return path if the source migration
+cannot yet be applied; do not install both distributions into one environment.
+Candidate artifact checks do not establish public PyPI availability.
+
 ## Package Names
 
-- Distribution: `zenture-sdk`
+- Distribution: `zenture`
 - Import package: `zenture`
-- Sync client: `Zenture`
-- Async client: `AsyncZenture`
+- Sync client: `ZentureClient`
+- Async client: `AsyncZentureClient`
 - Supported Python: Python 3.11, 3.12, and 3.13
 
 ## Installation
 
 ```bash
-pip install zenture-sdk
+pip install zenture
 ```
 
 Until the public beta is published to PyPI, use the internally shared wheel or
@@ -99,9 +111,9 @@ For cross-repository interface changes, run
 ## Sync Quickstart
 
 ```python
-from zenture import Zenture
+from zenture import ZentureClient
 
-with Zenture.from_env() as client:
+with ZentureClient.from_env() as client:
     print(client.helloworld())
 
     models = client.models.list(mode="single")
@@ -114,11 +126,11 @@ with Zenture.from_env() as client:
 ```python
 import asyncio
 
-from zenture import AsyncZenture
+from zenture import AsyncZentureClient
 
 
 async def main() -> None:
-    async with AsyncZenture.from_env() as client:
+    async with AsyncZentureClient.from_env() as client:
         result = await client.chat.run(
             message="Summarize this support note.",
             mode="single",
@@ -135,9 +147,9 @@ if __name__ == "__main__":
 ## Models
 
 ```python
-from zenture import Zenture
+from zenture import ZentureClient
 
-with Zenture.from_env() as client:
+with ZentureClient.from_env() as client:
     single_models = client.models.list(mode="single")
     multi_models = client.models.list(mode="multi")
     print(single_models.models[0].id)
@@ -149,9 +161,9 @@ with Zenture.from_env() as client:
 Single-model chat:
 
 ```python
-from zenture import Zenture
+from zenture import ZentureClient
 
-with Zenture.from_env() as client:
+with ZentureClient.from_env() as client:
     available_models = [
         model.id
         for model in client.models.list(mode="single").models
@@ -175,9 +187,9 @@ with Zenture.from_env() as client:
 Multi-model chat:
 
 ```python
-from zenture import Zenture
+from zenture import ZentureClient
 
-with Zenture.from_env() as client:
+with ZentureClient.from_env() as client:
     available_models = [
         model.id
         for model in client.models.list(mode="multi").models
@@ -203,10 +215,10 @@ helpers for it in this SDK.
 Continue a chat with a follow-up turn:
 
 ```python
-from zenture import Zenture
+from zenture import ZentureClient
 from zenture.idempotency import idempotency_key
 
-with Zenture.from_env() as client:
+with ZentureClient.from_env() as client:
     first = client.chat.run(
         message="Give me a concise onboarding checklist for a new API user.",
         mode="single",
@@ -230,9 +242,9 @@ Read chat turns when you need the exact `user_message`, `model_answer`, and
 `model_response_id` for evaluation:
 
 ```python
-from zenture import Zenture
+from zenture import ZentureClient
 
-with Zenture.from_env() as client:
+with ZentureClient.from_env() as client:
     messages = client.chat.messages("chat_example")
     turn = messages.turns[0]
     print(turn.user_message, turn.model_answer, turn.model_response_id)
@@ -241,9 +253,9 @@ with Zenture.from_env() as client:
 ## Input Wizard
 
 ```python
-from zenture import Zenture
+from zenture import ZentureClient
 
-with Zenture.from_env() as client:
+with ZentureClient.from_env() as client:
     result = client.input_wizard.run(
         prompt="Improve this onboarding prompt for a support assistant.",
         idempotency_key="case-123-input-wizard-v1",
@@ -273,10 +285,10 @@ contains sources, include them directly in `ai_answer` as Markdown links,
 footnotes, or plain URLs:
 
 ```python
-from zenture import Zenture
+from zenture import ZentureClient
 from zenture.idempotency import idempotency_key
 
-with Zenture.from_env() as client:
+with ZentureClient.from_env() as client:
     result = client.evaluations.run(
         user_message="What is zenture?",
         ai_answer=(
@@ -307,12 +319,12 @@ sent. A valid-looking target that the API user does not own raises
 `ZentureValidationError` from the API.
 
 ```python
-from zenture import Zenture
+from zenture import ZentureClient
 from zenture.idempotency import idempotency_key
 from pydantic import ValidationError
 from zenture.errors import ZentureValidationError
 
-with Zenture.from_env() as client:
+with ZentureClient.from_env() as client:
     try:
         chat = client.chat.run(
             message="Draft three customer-support next steps.",
@@ -375,9 +387,9 @@ polling does not perform extra read requests.
 Read wallet, usage, and route limits without creating billable work:
 
 ```python
-from zenture import Zenture
+from zenture import ZentureClient
 
-with Zenture.from_env() as client:
+with ZentureClient.from_env() as client:
     wallet = client.wallet.get()
     api_usage = client.usage.get(scope="api")
     all_usage = client.usage.get(scope="all")
@@ -394,9 +406,9 @@ Low-level create methods return an operation immediately. Use
 `client.operations.wait(...)` when you want to poll explicitly.
 
 ```python
-from zenture import Zenture
+from zenture import ZentureClient
 
-with Zenture.from_env() as client:
+with ZentureClient.from_env() as client:
     operation = client.chat.create_operation(
         message="Review this response.",
         mode="single",
@@ -433,9 +445,9 @@ List-style read helpers support `limit` and `cursor`. The default page size is
 include `next_cursor`; `None` means there is no further page.
 
 ```python
-from zenture import Zenture
+from zenture import ZentureClient
 
-with Zenture.from_env() as client:
+with ZentureClient.from_env() as client:
     page = client.chat.list(limit=50)
     print(page.next_cursor)
 
@@ -455,10 +467,10 @@ Mutating routes require `Idempotency-Key`. Use stable caller-owned keys that do
 not contain prompts, answers, API tokens, customer PII, or request bodies.
 
 ```python
-from zenture import Zenture
+from zenture import ZentureClient
 from zenture.idempotency import idempotency_key
 
-with Zenture.from_env() as client:
+with ZentureClient.from_env() as client:
     key = idempotency_key("case-123", "chat-turn-1", "v1")
     result = client.chat.run(
         message="Create a concise summary.",
@@ -478,7 +490,7 @@ Example keys:
 ## Errors
 
 ```python
-from zenture import Zenture
+from zenture import ZentureClient
 from zenture.errors import (
     ZentureAPIError,
     ZentureInsufficientCreditsError,
@@ -486,7 +498,7 @@ from zenture.errors import (
     ZentureRateLimitError,
 )
 
-with Zenture.from_env() as client:
+with ZentureClient.from_env() as client:
     try:
         result = client.chat.run(
             message="Summarize this incident.",

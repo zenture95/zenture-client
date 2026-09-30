@@ -2,13 +2,13 @@
 
 from __future__ import annotations
 
-from zenture import Zenture
+from zenture import ZentureClient
 from zenture.idempotency import idempotency_key
 
 
 def main() -> None:
     key = idempotency_key("example", "input-wizard", "v1")
-    with Zenture.from_env() as client:
+    with ZentureClient.from_env() as client:
         result = client.input_wizard.run(
             prompt="Improve this prompt for an internal support assistant.",
             idempotency_key=key,

@@ -10161,10 +10161,6 @@
     {
       "description": "Production public API origin",
       "url": "https://api.zenture.app"
-    },
-    {
-      "description": "Integration public API origin",
-      "url": "https://api-int.zenture.app"
     }
   ]
 }

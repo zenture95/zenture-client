@@ -15,8 +15,8 @@ For raw JSON response bodies and SDK model mapping, use
 
 ## Clients
 
-- `Zenture`: synchronous client using `httpx.Client`.
-- `AsyncZenture`: asynchronous client using `httpx.AsyncClient`.
+- `ZentureClient`: synchronous client using `httpx.Client`.
+- `AsyncZentureClient`: asynchronous client using `httpx.AsyncClient`.
 
 Both clients support `from_env()`, explicit close methods, and context manager
 usage.
@@ -139,10 +139,10 @@ not belong to the authenticated user, the SDK raises `ZentureValidationError`
 with `error_code == "validation_failed"`.
 
 ```python
-from zenture import Zenture
+from zenture import ZentureClient
 from zenture.idempotency import idempotency_key
 
-with Zenture.from_env() as client:
+with ZentureClient.from_env() as client:
     first = client.chat.run(
         message="Give me a concise onboarding checklist for a new API user.",
         mode="single",
@@ -202,10 +202,10 @@ Billing and evaluation result fields:
   `accessibilityScore`, and `responseTimeMs`.
 
 ```python
-from zenture import Zenture
+from zenture import ZentureClient
 from zenture.idempotency import idempotency_key
 
-with Zenture.from_env() as client:
+with ZentureClient.from_env() as client:
     evaluation = client.evaluations.run(
         user_message="What does the SDK do?",
         ai_answer=(

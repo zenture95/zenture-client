@@ -444,7 +444,7 @@ Base URL: `https://api.zenture.app/v1`
 
 Developer docs: `https://www.zenture.app/developers`
 
-Python SDK: [zenture95/zenture-sdk](https://github.com/zenture95/zenture-sdk)
+Python SDK: [zenture95/zenture-client](https://github.com/zenture95/zenture-client)
 ```
 
 ### `POST /v1/input-wizard`
@@ -672,6 +672,7 @@ Schema: `PublicRunCollectionResponse`
   "runs": [
     {
       "created_at": "2026-06-15T10:00:00Z",
+      "deadline_at": "example",
       "decision": "example",
       "profile": "fast",
       "run_id": "example",
@@ -716,6 +717,11 @@ Schema: `PublicRunResponse`
   "artifact_refs": [
     "example"
   ],
+  "billing_projection": {
+    "final_credits": "example",
+    "schema_version": "run.terminal_billing_projection.v1",
+    "status": "pending"
+  },
   "billing_summary": {},
   "cancellation_requested": true,
   "capability_coverage": {
@@ -731,6 +737,7 @@ Schema: `PublicRunResponse`
   },
   "completed_at": "2026-06-15T10:00:30Z",
   "created_at": "2026-06-15T10:00:00Z",
+  "deadline_at": "example",
   "event_cursor": "example",
   "family": "knowledge",
   "generation": 1,
@@ -749,6 +756,7 @@ Schema: `PublicRunResponse`
   "reason_code": "example",
   "run_id": "example",
   "run_insight_ref": "example",
+  "safe_result_content": "example",
   "started_at": "example",
   "status": "created",
   "task_contract_summary": {
@@ -772,6 +780,11 @@ Schema: `PublicRunResponse`
   "artifact_refs": [
     "example"
   ],
+  "billing_projection": {
+    "final_credits": "example",
+    "schema_version": "run.terminal_billing_projection.v1",
+    "status": "pending"
+  },
   "billing_summary": {},
   "cancellation_requested": true,
   "capability_coverage": {
@@ -787,6 +800,7 @@ Schema: `PublicRunResponse`
   },
   "completed_at": "2026-06-15T10:00:30Z",
   "created_at": "2026-06-15T10:00:00Z",
+  "deadline_at": "example",
   "event_cursor": "example",
   "family": "knowledge",
   "generation": 1,
@@ -805,6 +819,7 @@ Schema: `PublicRunResponse`
   "reason_code": "example",
   "run_id": "example",
   "run_insight_ref": "example",
+  "safe_result_content": "example",
   "started_at": "example",
   "status": "created",
   "task_contract_summary": {
@@ -851,6 +866,11 @@ Schema: `PrepareRunResponse`
 
 ```json
 {
+  "billing_projection": {
+    "estimated_credits": "example",
+    "maximum_credits": "example",
+    "schema_version": "run.prepare_credits_projection.v1"
+  },
   "estimated_credits": "example",
   "expected_duration_seconds": 1,
   "expires_at": "example",
@@ -899,6 +919,11 @@ Schema: `PublicRunResponse`
   "artifact_refs": [
     "example"
   ],
+  "billing_projection": {
+    "final_credits": "example",
+    "schema_version": "run.terminal_billing_projection.v1",
+    "status": "pending"
+  },
   "billing_summary": {},
   "cancellation_requested": true,
   "capability_coverage": {
@@ -914,6 +939,7 @@ Schema: `PublicRunResponse`
   },
   "completed_at": "2026-06-15T10:00:30Z",
   "created_at": "2026-06-15T10:00:00Z",
+  "deadline_at": "example",
   "event_cursor": "example",
   "family": "knowledge",
   "generation": 1,
@@ -932,6 +958,7 @@ Schema: `PublicRunResponse`
   "reason_code": "example",
   "run_id": "example",
   "run_insight_ref": "example",
+  "safe_result_content": "example",
   "started_at": "example",
   "status": "created",
   "task_contract_summary": {
@@ -977,6 +1004,11 @@ Schema: `PublicRunResponse`
   "artifact_refs": [
     "example"
   ],
+  "billing_projection": {
+    "final_credits": "example",
+    "schema_version": "run.terminal_billing_projection.v1",
+    "status": "pending"
+  },
   "billing_summary": {},
   "cancellation_requested": true,
   "capability_coverage": {
@@ -992,6 +1024,7 @@ Schema: `PublicRunResponse`
   },
   "completed_at": "2026-06-15T10:00:30Z",
   "created_at": "2026-06-15T10:00:00Z",
+  "deadline_at": "example",
   "event_cursor": "example",
   "family": "knowledge",
   "generation": 1,
@@ -1010,6 +1043,7 @@ Schema: `PublicRunResponse`
   "reason_code": "example",
   "run_id": "example",
   "run_insight_ref": "example",
+  "safe_result_content": "example",
   "started_at": "example",
   "status": "created",
   "task_contract_summary": {
@@ -1133,6 +1167,11 @@ Schema: `PublicRunOutcomeResponse`
   "artifact_refs": [
     "example"
   ],
+  "billing_projection": {
+    "final_credits": "example",
+    "schema_version": "run.terminal_billing_projection.v1",
+    "status": "pending"
+  },
   "billing_summary": {},
   "cancellation_requested": true,
   "capability_coverage": {
@@ -1148,6 +1187,7 @@ Schema: `PublicRunOutcomeResponse`
   },
   "completed_at": "2026-06-15T10:00:30Z",
   "created_at": "2026-06-15T10:00:00Z",
+  "deadline_at": "example",
   "event_cursor": "example",
   "family": "knowledge",
   "generation": 1,
@@ -1166,6 +1206,7 @@ Schema: `PublicRunOutcomeResponse`
   "reason_code": "example",
   "run_id": "example",
   "run_insight_ref": "example",
+  "safe_result_content": "example",
   "started_at": "example",
   "status": "created",
   "task_contract_summary": {

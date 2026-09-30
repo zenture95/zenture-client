@@ -2,7 +2,7 @@
 
 Filepath: src/zenture/testing/product_runs.py
 Purpose: Bind one approved fixture to one public SDK Run observation.
-Input: A caller-owned AsyncZenture client and a synthetic fixture.
+Input: A caller-owned AsyncZentureClient client and a synthetic fixture.
 Output: A bounded report containing the SDK responses and event replay.
 Critical Logic: Every observation stays bound to the Run created by the SDK.
 """
@@ -22,7 +22,7 @@ from zenture._contract import (
 if TYPE_CHECKING:
     from collections.abc import Mapping
 
-    from zenture import AsyncZenture
+    from zenture import AsyncZentureClient
 
 
 @dataclass(frozen=True, slots=True)
@@ -84,7 +84,7 @@ _TERMINAL_STATUSES = frozenset(
 
 
 async def _cleanup_run_after_error(
-    client: AsyncZenture,
+    client: AsyncZentureClient,
     run_id: str,
     *,
     idempotency_key: str,
@@ -105,7 +105,7 @@ async def _cleanup_run_after_error(
 
 
 async def run_product_e2e(
-    client: AsyncZenture,
+    client: AsyncZentureClient,
     fixture: ProductRunFixture,
     *,
     idempotency_key: str,

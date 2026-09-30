@@ -6,7 +6,7 @@ import httpx
 import pytest
 
 import zenture
-from zenture import AsyncZenture, Zenture
+from zenture import AsyncZentureClient, ZentureClient
 from zenture.errors import ZentureAuthenticationError
 
 LIVE_CLIENT_KEY = "zt_" + "live_" + "client_123"
@@ -17,13 +17,13 @@ INT_API_BASE_URL = "https://api-int.zenture.app"
 
 
 def test_public_clients_are_exported() -> None:
-    assert zenture.__all__ == ("AsyncZenture", "Zenture", "__version__")
-    assert zenture.Zenture is Zenture
-    assert zenture.AsyncZenture is AsyncZenture
+    assert zenture.__all__ == ("AsyncZentureClient", "ZentureClient", "__version__")
+    assert zenture.ZentureClient is ZentureClient
+    assert zenture.AsyncZentureClient is AsyncZentureClient
 
 
 def test_sync_client_repr_redacts_api_key() -> None:
-    client = Zenture(api_key=LIVE_CLIENT_KEY)
+    client = ZentureClient(api_key=LIVE_CLIENT_KEY)
 
     assert LIVE_CLIENT_KEY not in repr(client)
     assert "<redacted>" in repr(client)
@@ -36,10 +36,10 @@ def test_sync_client_accepts_non_production_base_url_for_test_tokens(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     with pytest.raises(ValueError, match="approved non-production"):
-        Zenture(api_key=TEST_CLIENT_KEY, base_url=INT_API_BASE_URL)
+        ZentureClient(api_key=TEST_CLIENT_KEY, base_url=INT_API_BASE_URL)
 
     monkeypatch.setenv(NON_PROD_OVERRIDE_ENV, "1")
-    client = Zenture(api_key=TEST_CLIENT_KEY, base_url=INT_API_BASE_URL)
+    client = ZentureClient(api_key=TEST_CLIENT_KEY, base_url=INT_API_BASE_URL)
 
     assert f"{INT_API_BASE_URL}/v1" in repr(client)
 
@@ -50,7 +50,7 @@ def test_sync_client_from_env(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("ZENTURE_API_KEY", TEST_CLIENT_ENV_KEY)
     monkeypatch.setenv("ZENTURE_BASE_URL", INT_API_BASE_URL)
     monkeypatch.setenv(NON_PROD_OVERRIDE_ENV, "1")
-    client = Zenture.from_env()
+    client = ZentureClient.from_env()
 
     assert TEST_CLIENT_ENV_KEY not in repr(client)
     assert f"{INT_API_BASE_URL}/v1" in repr(client)
@@ -67,7 +67,7 @@ def test_sync_helloworld_returns_markdown_without_authorization_header() -> None
         assert request.url == "https://api.zenture.app/v1/helloworld"
         return httpx.Response(200, text="# Hello from zenture")
 
-    client = Zenture(
+    client = ZentureClient(
         api_key=LIVE_CLIENT_KEY,
         http_client=httpx.Client(transport=httpx.MockTransport(handler)),
     )
@@ -93,7 +93,7 @@ def test_sync_client_maps_error_responses_without_leaking_tokens() -> None:
             },
         )
 
-    client = Zenture(
+    client = ZentureClient(
         api_key=LIVE_CLIENT_KEY,
         http_client=httpx.Client(transport=httpx.MockTransport(handler)),
     )
@@ -108,7 +108,7 @@ def test_sync_client_maps_error_responses_without_leaking_tokens() -> None:
 
 
 def test_sync_client_context_manager_closes_owned_client() -> None:
-    with Zenture(api_key=LIVE_CLIENT_KEY) as client:
+    with ZentureClient(api_key=LIVE_CLIENT_KEY) as client:
         assert not client.is_closed
 
     assert client.is_closed
@@ -124,7 +124,7 @@ async def test_async_helloworld_returns_markdown_without_authorization_header() 
         assert request.url == "https://api.zenture.app/v1/helloworld"
         return httpx.Response(200, text="# Hello from zenture")
 
-    client = AsyncZenture(
+    client = AsyncZentureClient(
         api_key=LIVE_CLIENT_KEY,
         http_client=httpx.AsyncClient(transport=httpx.MockTransport(handler)),
     )
@@ -138,7 +138,7 @@ async def test_async_helloworld_returns_markdown_without_authorization_header() 
 @pytest.mark.asyncio
 async def test_async_client_repr_redacts_api_key(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv(NON_PROD_OVERRIDE_ENV, "1")
-    client = AsyncZenture(api_key=TEST_CLIENT_KEY, base_url=INT_API_BASE_URL)
+    client = AsyncZentureClient(api_key=TEST_CLIENT_KEY, base_url=INT_API_BASE_URL)
 
     assert TEST_CLIENT_KEY not in repr(client)
     assert "<redacted>" in repr(client)
@@ -152,7 +152,7 @@ async def test_async_client_from_env(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("ZENTURE_API_KEY", TEST_CLIENT_ENV_KEY)
     monkeypatch.setenv("ZENTURE_BASE_URL", INT_API_BASE_URL)
     monkeypatch.setenv(NON_PROD_OVERRIDE_ENV, "1")
-    client = AsyncZenture.from_env()
+    client = AsyncZentureClient.from_env()
 
     assert TEST_CLIENT_ENV_KEY not in repr(client)
     assert f"{INT_API_BASE_URL}/v1" in repr(client)
@@ -162,7 +162,7 @@ async def test_async_client_from_env(monkeypatch: pytest.MonkeyPatch) -> None:
 
 @pytest.mark.asyncio
 async def test_async_client_context_manager_closes_owned_client() -> None:
-    async with AsyncZenture(api_key=LIVE_CLIENT_KEY) as client:
+    async with AsyncZentureClient(api_key=LIVE_CLIENT_KEY) as client:
         assert not client.is_closed
 
     assert client.is_closed

@@ -6,7 +6,7 @@ import json
 import sys
 from typing import Any
 
-from zenture import Zenture
+from zenture import ZentureClient
 
 
 def build_models_payload(client: Any) -> dict[str, list[dict[str, Any]]]:
@@ -22,7 +22,7 @@ def build_models_payload(client: Any) -> dict[str, list[dict[str, Any]]]:
 
 
 def main() -> None:
-    with Zenture.from_env() as client:
+    with ZentureClient.from_env() as client:
         sys.stdout.write(f"{json.dumps(build_models_payload(client), indent=2, sort_keys=True)}\n")
 
 

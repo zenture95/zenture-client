@@ -1,12 +1,12 @@
 # Contributing
 
-`zenture-sdk` is the public Python SDK for the zenture Public API. The current
+`zenture-client` provides the public `zenture` Python SDK for the zenture Public API. The current
 repository contains the runtime SDK, typed contract layer, public docs,
 examples, and packaging configuration used for prerelease validation.
 
 ## Development Standards
 
-- Keep public APIs typed and exposed through `Zenture`, `AsyncZenture`, and
+- Keep public APIs typed and exposed through `ZentureClient`, `AsyncZentureClient`, and
   resource attributes such as `client.chat`.
 - Keep `_transport`, `_resources`, and `_contract` as implementation
   namespaces.
@@ -44,8 +44,8 @@ Use one primary PR type:
 - `type: refactor` - internal change with no public behavior change
 - `type: security` - security hardening or vulnerability fix
 
-Public-surface changes require extra care. Any change to `Zenture`,
-`AsyncZenture`, public resources, public errors, return types, examples, or
+Public-surface changes require extra care. Any change to `ZentureClient`,
+`AsyncZentureClient`, public resources, public errors, return types, examples, or
 OpenAPI-derived contract behavior must update tests and docs in the same PR.
 Breaking changes are not allowed in V1 without an explicit release decision,
 migration note, and changelog entry.

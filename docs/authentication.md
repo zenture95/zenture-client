@@ -1,6 +1,6 @@
 # Authentication
 
-`zenture-sdk` is server-side only. zenture API tokens are credentials for
+`zenture` is server-side only. zenture API tokens are credentials for
 trusted backend environments such as services, workers, automation jobs, CI, and
 controlled notebooks.
 
@@ -31,7 +31,7 @@ set -a
 set +a
 ```
 
-Use `Zenture.from_env()` or `AsyncZenture.from_env()` so application code reads
+Use `ZentureClient.from_env()` or `AsyncZentureClient.from_env()` so application code reads
 the token from `ZENTURE_API_KEY`.
 
 ## Base URL

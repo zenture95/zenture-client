@@ -4,12 +4,12 @@ from __future__ import annotations
 
 import asyncio
 
-from zenture import AsyncZenture
+from zenture import AsyncZentureClient
 from zenture.idempotency import idempotency_key
 
 
 async def main() -> None:
-    async with AsyncZenture.from_env() as client:
+    async with AsyncZentureClient.from_env() as client:
         result = await client.evaluations.run(
             user_message="What does the SDK do?",
             ai_answer="It helps server-side Python integrations call zenture.",

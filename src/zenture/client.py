@@ -34,7 +34,7 @@ if TYPE_CHECKING:
     import httpx
 
 
-class Zenture:
+class ZentureClient:
     """Synchronous client for the zenture Public API."""
 
     def __init__(
@@ -98,7 +98,7 @@ class Zenture:
         max_retries: int | None = None,
         initial_retry_backoff: float | None = None,
         max_retry_backoff: float | None = None,
-    ) -> Zenture:
+    ) -> ZentureClient:
         """Create a client from supported environment variables."""
 
         config = ZentureConfig.from_env()
@@ -132,11 +132,11 @@ class Zenture:
 
         self._transport.close()
 
-    def __enter__(self) -> Zenture:
+    def __enter__(self) -> ZentureClient:
         return self
 
     def __exit__(self, *_exc_info: object) -> None:
         self.close()
 
     def __repr__(self) -> str:
-        return f"Zenture(api_key='{REDACTED}', base_url={self._config.api_base_url!r})"
+        return f"ZentureClient(api_key='{REDACTED}', base_url={self._config.api_base_url!r})"

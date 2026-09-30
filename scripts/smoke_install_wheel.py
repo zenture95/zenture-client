@@ -42,11 +42,17 @@ def main() -> None:
                 str(python),
                 "-c",
                 (
+                    "from importlib.metadata import metadata, version; "
                     "import zenture; "
-                    "from zenture import AsyncZenture, Zenture; "
-                    "assert zenture.__version__; "
-                    "assert Zenture.__name__ == 'Zenture'; "
-                    "assert AsyncZenture.__name__ == 'AsyncZenture'"
+                    "from zenture import AsyncZentureClient, ZentureClient; "
+                    "assert version('zenture') == zenture.__version__; "
+                    "assert metadata('zenture')['Name'] == 'zenture'; "
+                    "assert not hasattr(zenture, 'Zenture'); "
+                    "assert not hasattr(zenture, 'AsyncZenture'); "
+                    "assert 'Repository, https://github.com/zenture95/zenture-client' "
+                    "in metadata('zenture').get_all('Project-URL'); "
+                    "assert ZentureClient.__name__ == 'ZentureClient'; "
+                    "assert AsyncZentureClient.__name__ == 'AsyncZentureClient'"
                 ),
             ],
             check=True,

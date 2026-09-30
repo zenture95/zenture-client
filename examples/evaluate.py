@@ -11,7 +11,7 @@ import argparse
 import sys
 from typing import TypeVar
 
-from zenture import Zenture
+from zenture import ZentureClient
 from zenture.idempotency import idempotency_key
 
 T = TypeVar("T")
@@ -33,7 +33,7 @@ def _first_response_id(result: object) -> str:
     raise RuntimeError("Expected model_response_id in the completed chat operation result.")
 
 
-def evaluate_external_answer(client: Zenture) -> None:
+def evaluate_external_answer(client: ZentureClient) -> None:
     """Evaluate text that was produced outside zenture chat history."""
 
     result = client.evaluations.run(
@@ -47,7 +47,7 @@ def evaluate_external_answer(client: Zenture) -> None:
     print("external", result.operation_id, result.status, result.result)
 
 
-def evaluate_zenture_chat_turn(client: Zenture) -> None:
+def evaluate_zenture_chat_turn(client: ZentureClient) -> None:
     """Create a chat, continue it, and evaluate the second AI answer."""
 
     first_message = "Give me a concise onboarding checklist for a new API user."
@@ -94,7 +94,7 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument("mode", choices=("external", "chat-turn"), default="external", nargs="?")
     args = parser.parse_args([] if argv is None else argv)
 
-    with Zenture.from_env() as client:
+    with ZentureClient.from_env() as client:
         if args.mode == "external":
             evaluate_external_answer(client)
         else:

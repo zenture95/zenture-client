@@ -18,9 +18,11 @@ def test_package_exposes_version() -> None:
 
 
 def test_public_exports_are_intentionally_minimal_for_first_client_cut() -> None:
-    assert zenture.__all__ == ("AsyncZenture", "Zenture", "__version__")
-    assert hasattr(zenture, "Zenture")
-    assert hasattr(zenture, "AsyncZenture")
+    assert zenture.__all__ == ("AsyncZentureClient", "ZentureClient", "__version__")
+    assert hasattr(zenture, "ZentureClient")
+    assert not hasattr(zenture, "Zenture")
+    assert hasattr(zenture, "AsyncZentureClient")
+    assert not hasattr(zenture, "AsyncZenture")
     assert not hasattr(zenture, "PublicOperationResponse")
 
 
@@ -60,3 +62,18 @@ def test_package_artifact_and_install_smoke_scripts_are_wired_into_development_w
     assert Path("scripts/smoke_install_wheel.py").is_file()
     assert "python scripts/check_package_artifacts.py dist" in ci
     assert "python scripts/smoke_install_wheel.py dist" in ci
+
+
+def test_canonical_distribution_and_repository_metadata() -> None:
+    project = tomllib.loads(Path("pyproject.toml").read_text())["project"]
+    assert project["name"] == "zenture"
+    assert project["urls"]["Repository"] == "https://github.com/zenture95/zenture-client"
+    assert project["urls"]["Issues"] == "https://github.com/zenture95/zenture-client/issues"
+
+
+def test_release_transfers_canonical_artifacts_with_explicit_publish_gate() -> None:
+    release = Path(".github/workflows/release.yml").read_text()
+    assert release.count("name: zenture-dist") == 2
+    assert "zenture-sdk-dist" not in release
+    assert "if: github.event_name == 'workflow_dispatch' && inputs.publish == 'true'" in release
+    assert "environment: pypi" in release

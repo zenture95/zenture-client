@@ -14,7 +14,7 @@ from zenture._version import __version__
 if TYPE_CHECKING:
     from zenture.config import ZentureConfig
 
-DEFAULT_USER_AGENT = f"zenture-sdk-python/{__version__}"
+DEFAULT_USER_AGENT = f"zenture-python/{__version__}"
 MAX_RESPONSE_BYTES = 512 * 1024
 
 

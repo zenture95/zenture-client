@@ -4,13 +4,13 @@ from __future__ import annotations
 
 import asyncio
 
-from zenture import AsyncZenture
+from zenture import AsyncZentureClient
 from zenture.idempotency import idempotency_key
 
 
 async def main() -> None:
     key = idempotency_key("example", "async-chat", "v1")
-    async with AsyncZenture.from_env() as client:
+    async with AsyncZentureClient.from_env() as client:
         result = await client.chat.run(
             message="Summarize this support note.",
             mode="single",

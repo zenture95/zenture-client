@@ -2,13 +2,13 @@
 
 from __future__ import annotations
 
-from zenture import Zenture
+from zenture import ZentureClient
 from zenture.idempotency import idempotency_key
 
 
 def main() -> None:
     key = idempotency_key("example", "operation-polling", "v1")
-    with Zenture.from_env() as client:
+    with ZentureClient.from_env() as client:
         operation = client.chat.create_operation(
             message="Review this response for clarity.",
             mode="single",

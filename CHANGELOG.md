@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- Rename the repository to `zenture-client`, the distribution to `zenture`, and
+  public API classes to `ZentureClient` / `AsyncZentureClient` without aliases.
+- Preserve API-token resource behavior and caller-provided bearer MCP support;
+  OAuth and public package publication remain outside this source cutover.
+
 All notable changes to `zenture-sdk` will be documented in this file.
 
 The project follows semantic versioning once public releases begin. Prerelease

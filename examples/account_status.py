@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
-from zenture import Zenture
+from zenture import ZentureClient
 
 
 def main() -> None:
-    with Zenture.from_env() as client:
+    with ZentureClient.from_env() as client:
         wallet = client.wallet.get()
         api_usage = client.usage.get(scope="api")
         limits = client.limits.get()

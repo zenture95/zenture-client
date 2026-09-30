@@ -63,9 +63,9 @@ Failed terminal operations keep the operation response shape:
 Route: `GET /v1/helloworld`
 
 ```python
-from zenture import Zenture
+from zenture import ZentureClient
 
-with Zenture.from_env() as client:
+with ZentureClient.from_env() as client:
     response = client.helloworld()
     print(response)
 ```
@@ -85,9 +85,9 @@ Use this only as a cheap connectivity check. It does not create billable work.
 Route: `GET /v1/models`
 
 ```python
-from zenture import Zenture
+from zenture import ZentureClient
 
-with Zenture.from_env() as client:
+with ZentureClient.from_env() as client:
     response = client.models.list(mode="single")
     for model in response.models:
         print(model.id, model.display_name, model.is_available)
@@ -129,10 +129,10 @@ chat. Omit `mode` to list all visible public models.
 Route: `POST /v1/chat`
 
 ```python
-from zenture import Zenture
+from zenture import ZentureClient
 from zenture.idempotency import idempotency_key
 
-with Zenture.from_env() as client:
+with ZentureClient.from_env() as client:
     operation = client.chat.create(
         message="Draft three support next steps.",
         mode="single",
@@ -159,10 +159,10 @@ Use `client.operations.wait(operation.operation_id)` to poll this operation.
 Route: `POST /v1/chat`
 
 ```python
-from zenture import Zenture
+from zenture import ZentureClient
 from zenture.idempotency import idempotency_key
 
-with Zenture.from_env() as client:
+with ZentureClient.from_env() as client:
     operation = client.chat.create_operation(
         message="Compare these draft answers.",
         mode="multi",
@@ -190,10 +190,10 @@ Example response:
 Route: `POST /v1/chat`, then `GET /v1/operations/{operation_id}`
 
 ```python
-from zenture import Zenture
+from zenture import ZentureClient
 from zenture.idempotency import idempotency_key
 
-with Zenture.from_env() as client:
+with ZentureClient.from_env() as client:
     result = client.chat.run(
         message="Draft three support next steps.",
         mode="single",
@@ -243,10 +243,10 @@ SDK normalizes it before returning the typed object.
 Follow-up turn:
 
 ```python
-from zenture import Zenture
+from zenture import ZentureClient
 from zenture.idempotency import idempotency_key
 
-with Zenture.from_env() as client:
+with ZentureClient.from_env() as client:
     first = client.chat.run(
         message="Create a short onboarding checklist.",
         mode="single",
@@ -267,9 +267,9 @@ with Zenture.from_env() as client:
 Route: `GET /v1/chats`
 
 ```python
-from zenture import Zenture
+from zenture import ZentureClient
 
-with Zenture.from_env() as client:
+with ZentureClient.from_env() as client:
     page = client.chat.list(limit=50)
     print(page.next_cursor)
 ```
@@ -297,9 +297,9 @@ Example response:
 Route: repeated `GET /v1/chats`
 
 ```python
-from zenture import Zenture
+from zenture import ZentureClient
 
-with Zenture.from_env() as client:
+with ZentureClient.from_env() as client:
     for chat in client.chat.iter(limit=50):
         print(chat.chat_id, chat.title)
 ```
@@ -322,9 +322,9 @@ The iterator follows `next_cursor` until the API returns `None`.
 Route: `GET /v1/chats/{chat_id}`
 
 ```python
-from zenture import Zenture
+from zenture import ZentureClient
 
-with Zenture.from_env() as client:
+with ZentureClient.from_env() as client:
     response = client.chat.get("chat_example")
     print(response.chat.chat_id)
 ```
@@ -357,9 +357,9 @@ Example response:
 Route: `GET /v1/chats/{chat_id}/messages`
 
 ```python
-from zenture import Zenture
+from zenture import ZentureClient
 
-with Zenture.from_env() as client:
+with ZentureClient.from_env() as client:
     response = client.chat.messages("chat_example", limit=50)
     turn = response.turns[0]
     print(turn.user_message, turn.model_answer, turn.model_response_id)
@@ -392,9 +392,9 @@ internal evaluation of an existing zenture chat answer.
 Route: repeated `GET /v1/chats/{chat_id}/messages`
 
 ```python
-from zenture import Zenture
+from zenture import ZentureClient
 
-with Zenture.from_env() as client:
+with ZentureClient.from_env() as client:
     for turn in client.chat.iter_messages("chat_example", limit=50):
         print(turn.turn_id, turn.model_response_id)
 ```
@@ -419,10 +419,10 @@ Example yielded item:
 Route: `POST /v1/input-wizard`
 
 ```python
-from zenture import Zenture
+from zenture import ZentureClient
 from zenture.idempotency import idempotency_key
 
-with Zenture.from_env() as client:
+with ZentureClient.from_env() as client:
     operation = client.input_wizard.create(
         prompt="Improve this onboarding prompt for a support assistant.",
         idempotency_key=idempotency_key("case-123", "input-wizard", "v1"),
@@ -457,10 +457,10 @@ Route: `POST /v1/input-wizard`, then `GET /v1/operations/{operation_id}` if
 needed
 
 ```python
-from zenture import Zenture
+from zenture import ZentureClient
 from zenture.idempotency import idempotency_key
 
-with Zenture.from_env() as client:
+with ZentureClient.from_env() as client:
     result = client.input_wizard.run(
         prompt="Improve this onboarding prompt for a support assistant.",
         idempotency_key=idempotency_key("case-123", "input-wizard", "v1"),
@@ -544,10 +544,10 @@ unless your application is allowed to send them to zenture.
 Route: `POST /v1/evaluate`
 
 ```python
-from zenture import Zenture
+from zenture import ZentureClient
 from zenture.idempotency import idempotency_key
 
-with Zenture.from_env() as client:
+with ZentureClient.from_env() as client:
     operation = client.evaluations.create(
         user_message="What does zenture do?",
         ai_answer="zenture evaluates AI outputs.",
@@ -574,10 +574,10 @@ Example response:
 Route: `POST /v1/evaluate`, then `GET /v1/operations/{operation_id}`
 
 ```python
-from zenture import Zenture
+from zenture import ZentureClient
 from zenture.idempotency import idempotency_key
 
-with Zenture.from_env() as client:
+with ZentureClient.from_env() as client:
     result = client.evaluations.run(
         user_message="What changed in today's German financial news?",
         ai_answer=(
@@ -628,12 +628,12 @@ the same SDK call. The SDK then performs one additional
 Route: `POST /v1/evaluate`, then `GET /v1/operations/{operation_id}`
 
 ```python
-from zenture import Zenture
+from zenture import ZentureClient
 from zenture.idempotency import idempotency_key
 from pydantic import ValidationError
 from zenture.errors import ZentureValidationError
 
-with Zenture.from_env() as client:
+with ZentureClient.from_env() as client:
     try:
         chat = client.chat.run(
             message="Draft three support next steps.",
@@ -754,9 +754,9 @@ Example response:
 Route: `GET /v1/evaluations`
 
 ```python
-from zenture import Zenture
+from zenture import ZentureClient
 
-with Zenture.from_env() as client:
+with ZentureClient.from_env() as client:
     page = client.evaluations.list(limit=50)
     print(page.next_cursor)
 ```
@@ -782,9 +782,9 @@ Example response:
 Route: repeated `GET /v1/evaluations`
 
 ```python
-from zenture import Zenture
+from zenture import ZentureClient
 
-with Zenture.from_env() as client:
+with ZentureClient.from_env() as client:
     for evaluation in client.evaluations.iter(limit=50):
         print(evaluation.evaluation_id, evaluation.score)
 ```
@@ -805,9 +805,9 @@ Example yielded item:
 Route: `GET /v1/evaluations/{evaluation_id}`
 
 ```python
-from zenture import Zenture
+from zenture import ZentureClient
 
-with Zenture.from_env() as client:
+with ZentureClient.from_env() as client:
     evaluation = client.evaluations.get("eval_example")
     print(evaluation.status, evaluation.score)
 ```
@@ -830,9 +830,9 @@ Example response:
 Route: `GET /v1/operations/{operation_id}`
 
 ```python
-from zenture import Zenture
+from zenture import ZentureClient
 
-with Zenture.from_env() as client:
+with ZentureClient.from_env() as client:
     operation = client.operations.get("op_example")
     print(operation.status, operation.result)
 ```
@@ -876,9 +876,9 @@ as a prompt or answer body store.
 Route: repeated `GET /v1/operations/{operation_id}`
 
 ```python
-from zenture import Zenture
+from zenture import ZentureClient
 
-with Zenture.from_env() as client:
+with ZentureClient.from_env() as client:
     final_operation = client.operations.wait("op_example", timeout=120.0)
     print(final_operation.status)
 ```
@@ -914,9 +914,9 @@ same cadence, do not poll faster than once per second per operation, and honor
 Route: `GET /v1/wallet`
 
 ```python
-from zenture import Zenture
+from zenture import ZentureClient
 
-with Zenture.from_env() as client:
+with ZentureClient.from_env() as client:
     wallet = client.wallet.get()
     print(wallet.plan, wallet.status, wallet.credits_available.amount)
 ```
@@ -937,9 +937,9 @@ Example response:
 Route: `GET /v1/usage`
 
 ```python
-from zenture import Zenture
+from zenture import ZentureClient
 
-with Zenture.from_env() as client:
+with ZentureClient.from_env() as client:
     api_usage = client.usage.get(scope="api")
     all_usage = client.usage.get(scope="all")
     print(api_usage.operation_count, all_usage.operation_count)
@@ -962,9 +962,9 @@ counters visible to the token.
 Route: `GET /v1/limits`
 
 ```python
-from zenture import Zenture
+from zenture import ZentureClient
 
-with Zenture.from_env() as client:
+with ZentureClient.from_env() as client:
     limits = client.limits.get()
     print(limits.routes["POST /v1/evaluate"].idempotency_required)
 ```
@@ -997,14 +997,14 @@ Example response:
 
 ## Async Client
 
-`AsyncZenture` exposes the same resources and response shapes. Only `await` and
+`AsyncZentureClient` exposes the same resources and response shapes. Only `await` and
 `async with` change:
 
 ```python
-from zenture import AsyncZenture
+from zenture import AsyncZentureClient
 from zenture.idempotency import idempotency_key
 
-async with AsyncZenture.from_env() as client:
+async with AsyncZentureClient.from_env() as client:
     result = await client.evaluations.run(
         user_message="What does zenture do?",
         ai_answer="zenture evaluates AI outputs.",
@@ -1017,9 +1017,9 @@ async with AsyncZenture.from_env() as client:
 Async iterators use `async for`:
 
 ```python
-from zenture import AsyncZenture
+from zenture import AsyncZentureClient
 
-async with AsyncZenture.from_env() as client:
+async with AsyncZentureClient.from_env() as client:
     async for evaluation in client.evaluations.iter(limit=50):
         print(evaluation.evaluation_id)
 ```

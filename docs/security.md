@@ -1,13 +1,13 @@
 # Security
 
-`zenture-sdk` is server-side only. API tokens are secrets and must never be
+`zenture` is server-side only. API tokens are secrets and must never be
 embedded in browser code, mobile apps, frontend bundles, public notebooks,
 logs, traces, analytics, screenshots, or support messages.
 
 ## Token Handling
 
-- Load tokens from `ZENTURE_API_KEY` via `Zenture.from_env()` or
-  `AsyncZenture.from_env()`.
+- Load tokens from `ZENTURE_API_KEY` via `ZentureClient.from_env()` or
+  `AsyncZentureClient.from_env()`.
 - Do not hardcode token values in Python files.
 - Do not log Authorization headers.
 - Do not include prompts or model answers in error messages.

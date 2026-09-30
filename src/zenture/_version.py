@@ -1,4 +1,4 @@
-"""Version metadata for zenture-sdk."""
+"""Version metadata for zenture."""
 
 from __future__ import annotations
 

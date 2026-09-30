@@ -9,7 +9,7 @@ IGNORED_PACKAGES = {
     "pip",
     "setuptools",
     "wheel",
-    "zenture-sdk",
+    "zenture",
 }
 
 ALLOWED_LICENSE_MARKERS = (

@@ -202,15 +202,15 @@ def test_readme_is_beta_ready_and_public_safe() -> None:
     assert '<img src="https://ai.zenture.app/logo.svg"' in text
     assert "docs/assets/zenture-logo.svg" not in text
     required = [
-        "pip install zenture-sdk",
+        "pip install zenture",
         "Python 3.11",
         "server-side only",
         "ZENTURE_API_KEY",
         "https://ai.zenture.app/profile?tab=api-tokens",
         "https://www.zenture.app/developers",
         "docs/sdk-call-reference.md",
-        "Zenture.from_env()",
-        "AsyncZenture.from_env()",
+        "ZentureClient.from_env()",
+        "AsyncZentureClient.from_env()",
         "helloworld",
         'models.list(mode="single")',
         'models.list(mode="multi")',
@@ -380,7 +380,7 @@ def test_examples_exist_compile_and_use_env_clients() -> None:
 
     async_source = _read(ROOT / "examples" / "async_chat.py")
     assert "asyncio.run(main())" in async_source
-    assert "AsyncZenture.from_env()" in async_source
+    assert "AsyncZentureClient.from_env()" in async_source
 
     multi_source = _read(ROOT / "examples" / "chat_multi.py")
     assert 'models.list(mode="multi")' in multi_source

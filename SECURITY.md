@@ -2,12 +2,12 @@
 
 ## Supported Versions
 
-`zenture-sdk` is prerelease software. Security reports are welcome for SDK
+`zenture` is prerelease software. Security reports are welcome for SDK
 runtime behavior, documentation, examples, packaging, CI, and release workflows.
 
 ## Reporting a Vulnerability
 
-Open a GitHub issue in the `zenture-sdk` repository for security hardening
+Open a GitHub issue in the `zenture` repository for security hardening
 requests, dependency concerns, release-process issues, documentation gaps,
 redaction problems, or suspected SDK vulnerabilities that do not include active
 secrets, exploit payloads, private customer data, or instructions for abusing

@@ -1,0 +1,368 @@
+"""Scenarios 3, 4 and 5: loopback browser authorization, redemption, and persistence."""
+
+from __future__ import annotations
+
+import base64
+import hashlib
+import json
+import select
+import socket
+import threading
+import time
+import urllib.parse
+from typing import TYPE_CHECKING, Any
+
+import httpx
+import pytest
+from auth_harness import Environment, browser_opener, runtime_for
+
+from zenture._auth.browser import bind_loopback, wait_for_callback
+from zenture._auth.errors import (
+    AuthorizationRequired,
+    AuthUnavailable,
+    LoginCancelled,
+    SecureStoreUnavailable,
+)
+from zenture._auth.login import LoginFlow
+from zenture._auth.model import CLIENT_ID
+from zenture._auth.store import MemoryStore, RecordKey, RecordStore, StoreError
+
+if TYPE_CHECKING:
+    from pathlib import Path
+
+
+def _login(env: Environment, store: RecordStore, lock_dir: Path, opener: Any, **kw: Any) -> Any:
+    flow = LoginFlow(runtime_for(store, lock_dir, opener, **kw))
+    return flow.login(endpoint=env.endpoint)
+
+
+def _key(env: Environment) -> RecordKey:
+    return RecordKey(env.issuer.issuer, env.mcp.resource, CLIENT_ID)
+
+
+def test_authorization_request_carries_pkce_state_resource_and_loopback_redirect(
+    env: Environment, store: RecordStore, lock_dir: Path
+) -> None:
+    opener, opened = browser_opener()
+
+    session = _login(env, store, lock_dir, opener)
+
+    query = dict(urllib.parse.parse_qsl(urllib.parse.urlsplit(opened[0]).query))
+    assert query["client_id"] == "zenture-client"
+    assert query["response_type"] == "code"
+    assert query["scope"] == "openid mcp:run offline_access"
+    assert query["resource"] == env.mcp.resource
+    assert query["code_challenge_method"] == "S256"
+    assert len(base64.urlsafe_b64decode(query["state"] + "=" * (-len(query["state"]) % 4))) == 32
+    assert query["redirect_uri"].startswith("http://127.0.0.1:")
+    assert query["redirect_uri"].endswith("/oauth/callback")
+    # Redemption proves verifier/challenge pairing, code, redirect, client and resource.
+    redeem = env.issuer.token_requests[0]
+    assert redeem["grant_type"] == "authorization_code"
+    digest = hashlib.sha256(redeem["code_verifier"].encode()).digest()
+    assert base64.urlsafe_b64encode(digest).rstrip(b"=").decode() == query["code_challenge"]
+    assert redeem["redirect_uri"] == query["redirect_uri"]
+    assert redeem["client_id"] == CLIENT_ID
+    assert redeem["resource"] == env.mcp.resource
+    assert session.binding.sub == "user-1"
+    assert session.binding.connection_id == "conn-1"
+    assert session.binding.owner_epoch == 3
+    assert session.binding.authorization_generation == 7
+
+
+def test_listener_is_bound_before_the_browser_opens_and_only_on_loopback(
+    env: Environment, store: RecordStore, lock_dir: Path
+) -> None:
+    observed: dict[str, Any] = {}
+
+    def opener(url: str) -> object:
+        redirect = dict(urllib.parse.parse_qsl(urllib.parse.urlsplit(url).query))["redirect_uri"]
+        port = urllib.parse.urlsplit(redirect).port
+        assert port is not None
+        with socket.create_connection(("127.0.0.1", port), timeout=2) as probe:
+            observed["connected_before_browser"] = True
+            observed["local"] = probe.getpeername()[0]
+        raise KeyboardInterrupt
+
+    with pytest.raises(KeyboardInterrupt):
+        _login(env, store, lock_dir, opener)
+
+    assert observed == {"connected_before_browser": True, "local": "127.0.0.1"}
+
+
+def test_listener_is_closed_after_success_error_timeout_and_interrupt() -> None:
+    def closed(listener: socket.socket) -> bool:
+        return listener.fileno() == -1
+
+    listener, redirect = bind_loopback()
+    with pytest.raises(AuthUnavailable, match="login_timed_out"):
+        wait_for_callback(
+            listener, redirect_uri=redirect, state="s" * 43, verifier="v", issuer="i", timeout=0.3
+        )
+    assert closed(listener)
+
+    listener, redirect = bind_loopback()
+    cancel = threading.Event()
+    cancel.set()
+    with pytest.raises(LoginCancelled):
+        wait_for_callback(
+            listener,
+            redirect_uri=redirect,
+            state="s" * 43,
+            verifier="v",
+            issuer="i",
+            cancel=cancel,
+        )
+    assert closed(listener)
+
+
+def test_keyboard_interrupt_while_waiting_closes_the_listener(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+
+    listener, redirect = bind_loopback()
+
+    def interrupted(*_args: object) -> object:
+        raise KeyboardInterrupt
+
+    monkeypatch.setattr(select, "select", interrupted)
+    with pytest.raises(KeyboardInterrupt):
+        wait_for_callback(listener, redirect_uri=redirect, state="s" * 43, verifier="v", issuer="i")
+    assert listener.fileno() == -1
+
+
+def test_listener_binds_ipv6_loopback_when_ipv4_is_unavailable(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+
+    real_socket = socket.socket
+
+    class V4Refused(real_socket):  # type: ignore[valid-type,misc]
+        def bind(self, address: Any) -> None:
+            if self.family == socket.AF_INET:
+                raise OSError("no ipv4")
+            super().bind(address)
+
+    monkeypatch.setattr(socket, "socket", V4Refused)
+    try:
+        listener, redirect = bind_loopback()
+    except AuthUnavailable:
+        pytest.skip("IPv6 loopback unavailable on this host")
+    try:
+        assert redirect.startswith("http://[::1]:")
+        assert listener.getsockname()[0] == "::1"
+    finally:
+        listener.close()
+
+
+def test_unsolicited_and_replayed_requests_are_ignored_until_the_exact_callback(
+    env: Environment, store: RecordStore, lock_dir: Path
+) -> None:
+    results: dict[str, Any] = {}
+
+    def opener(url: str) -> object:
+        query = dict(urllib.parse.parse_qsl(urllib.parse.urlsplit(url).query))
+        redirect = query["redirect_uri"]
+        base = redirect.removesuffix("/oauth/callback")
+
+        def drive() -> None:
+            with httpx.Client(timeout=5) as client:
+                results["wrong_path"] = client.get(f"{base}/other?state={query['state']}")
+                results["wrong_state"] = client.get(f"{redirect}?state=x&code=c&iss=i")
+                results["no_state"] = client.get(f"{redirect}?code=c")
+                results["post"] = client.post(redirect, data={"state": query["state"]})
+                results["bad_host"] = client.get(
+                    redirect, headers={"Host": "evil.example"}, params={"state": query["state"]}
+                )
+                location = httpx.get(url, follow_redirects=False).headers["location"]
+                results["good"] = client.get(location)
+                try:
+                    results["replay"] = client.get(location)
+                except httpx.HTTPError as exc:
+                    results["replay"] = exc
+
+        threading.Thread(target=drive, daemon=True).start()
+        return True
+
+    session = _login(env, store, lock_dir, opener)
+
+    for name in ("wrong_path", "wrong_state", "no_state", "post", "bad_host"):
+        assert results[name].status_code == 400, name
+    deadline = time.monotonic() + 5
+    while "replay" not in results and time.monotonic() < deadline:
+        time.sleep(0.02)
+    assert results["good"].status_code == 200
+    assert isinstance(results["replay"], httpx.HTTPError)  # listener already closed
+    assert session.binding.sub == "user-1"
+    # only one code was ever redeemed
+    assert (
+        len([r for r in env.issuer.token_requests if r["grant_type"] == "authorization_code"]) == 1
+    )
+
+
+@pytest.mark.parametrize("variant", ["omit_iss", "wrong_iss"])
+def test_missing_or_wrong_iss_is_rejected_before_redemption(
+    env: Environment, store: RecordStore, lock_dir: Path, variant: str
+) -> None:
+    if variant == "omit_iss":
+        env.issuer.omit_iss = True
+    else:
+        env.issuer.response_iss = "http://127.0.0.1:1"
+    opener, opened = browser_opener()
+
+    with pytest.raises(AuthUnavailable) as caught:
+        _login(env, store, lock_dir, opener)
+
+    assert caught.value.code == "authorization_response_invalid"
+    assert env.issuer.token_requests == []
+    redirect = dict(urllib.parse.parse_qsl(urllib.parse.urlsplit(opened[0]).query))["redirect_uri"]
+    with pytest.raises(OSError):  # noqa: PT011 - any refusal proves the listener is closed
+        socket.create_connection(
+            ("127.0.0.1", urllib.parse.urlsplit(redirect).port or 0), timeout=2
+        )
+    assert store.load(_key(env)) is None
+
+
+def test_access_denied_is_a_cancelled_login(
+    env: Environment, store: RecordStore, lock_dir: Path
+) -> None:
+    env.issuer.deny = True
+    opener, _ = browser_opener()
+
+    with pytest.raises(LoginCancelled):
+        _login(env, store, lock_dir, opener)
+
+    assert env.issuer.token_requests == []
+
+
+def test_redemption_without_refresh_token_requires_authorization(
+    env: Environment, store: RecordStore, lock_dir: Path
+) -> None:
+    env.issuer.omit_refresh_token = True
+    opener, _ = browser_opener()
+
+    with pytest.raises(AuthorizationRequired):
+        _login(env, store, lock_dir, opener)
+
+    assert store.load(_key(env)) is None
+
+
+@pytest.mark.parametrize(
+    "tamper",
+    ["audience", "client"],
+)
+def test_access_token_with_foreign_audience_or_client_is_not_accepted(
+    env: Environment, store: RecordStore, lock_dir: Path, tamper: str
+) -> None:
+    if tamper == "audience":
+        env.issuer.access_audience = "http://127.0.0.1:9"
+    else:
+        env.issuer.access_client_id = "someone-else"
+    opener, _ = browser_opener()
+
+    with pytest.raises(AuthUnavailable) as caught:
+        _login(env, store, lock_dir, opener)
+
+    assert caught.value.code == "token_response_rejected"
+    assert store.load(_key(env)) is None
+
+
+def test_access_token_signed_by_an_unknown_key_is_not_accepted(
+    env: Environment, store: RecordStore, lock_dir: Path
+) -> None:
+    from cryptography.hazmat.primitives.asymmetric import ec
+
+    env.issuer.jwks_key = ec.generate_private_key(ec.SECP256R1())
+    opener, _ = browser_opener()
+
+    with pytest.raises(AuthUnavailable) as caught:
+        _login(env, store, lock_dir, opener)
+
+    assert caught.value.code == "token_response_rejected"
+
+
+def test_successful_login_persists_one_bounded_record_without_the_access_token(
+    env: Environment, lock_dir: Path
+) -> None:
+    saved: list[str] = []
+
+    class Spy(MemoryStore):
+        def save(self, record: Any) -> None:
+            saved.append(record.to_json())
+            super().save(record)
+
+    store = Spy()
+    opener, _ = browser_opener()
+
+    session = _login(env, store, lock_dir, opener)
+
+    assert len(saved) == 1
+    raw = saved[0]
+    record = json.loads(raw)
+    assert set(record) == {
+        "v",
+        "issuer",
+        "resource",
+        "client_id",
+        "sub",
+        "connection_id",
+        "owner_epoch",
+        "authorization_generation",
+        "refresh_token",
+        "state",
+        "rotation_id",
+    }
+    assert record["state"] == "ready"
+    assert len(raw.encode()) <= 1024
+    access = session._core._access
+    assert access is not None
+    assert access not in raw
+    assert "access_token" not in record
+
+
+def test_store_write_failure_after_login_is_a_store_error_not_a_silent_success(
+    env: Environment, lock_dir: Path
+) -> None:
+    class Broken(MemoryStore):
+        def save(self, record: Any) -> None:
+            raise StoreError
+
+    opener, _ = browser_opener()
+
+    with pytest.raises(SecureStoreUnavailable):
+        _login(env, Broken(), lock_dir, opener)
+
+
+def test_session_only_keeps_everything_in_memory_and_never_builds_a_native_store(
+    env: Environment, lock_dir: Path
+) -> None:
+    opener, _ = browser_opener()
+
+    def forbidden() -> RecordStore:
+        raise AssertionError("native store must not be built for session-only")
+
+    flow = LoginFlow(runtime_for(MemoryStore(), lock_dir, opener, native_store=forbidden))
+    session = flow.login(session_only=True, endpoint=env.endpoint)
+
+    assert session.binding.connection_id == "conn-1"
+    assert not lock_dir.exists()
+
+
+def test_native_store_unavailable_fails_before_the_browser_opens(
+    env: Environment, lock_dir: Path
+) -> None:
+    opened: list[str] = []
+
+    def unavailable() -> RecordStore:
+        raise SecureStoreUnavailable
+
+    flow = LoginFlow(
+        runtime_for(
+            MemoryStore(), lock_dir, lambda url: opened.append(url), native_store=unavailable
+        )
+    )
+    with pytest.raises(SecureStoreUnavailable) as caught:
+        flow.login(endpoint=env.endpoint)
+
+    assert opened == []
+    assert caught.value.next_action == "use_session_only"

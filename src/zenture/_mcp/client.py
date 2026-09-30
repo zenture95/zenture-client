@@ -6,7 +6,7 @@ import json
 import re
 from collections.abc import AsyncGenerator, Iterable, Mapping, Sequence
 from contextlib import asynccontextmanager
-from typing import Any, Literal, TypeVar, cast
+from typing import TYPE_CHECKING, Any, Literal, TypeVar, cast
 
 from pydantic import BaseModel, ValidationError
 
@@ -36,6 +36,9 @@ from zenture._mcp.transport import (
     open_streamable_http_transport,
 )
 from zenture.errors import ZentureMCPError, ZentureMCPProtocolError
+
+if TYPE_CHECKING:
+    from zenture._auth.session import AuthSession
 
 _MAX_ARGUMENT_BYTES = 256 * 1024
 _MAX_RESULT_BYTES = 256 * 1024
@@ -120,15 +123,9 @@ def _structured_content(result: object) -> object:
     block = content[0]
     block_mapping = _mapping(block)
     block_type = (
-        block_mapping.get("type")
-        if block_mapping is not None
-        else getattr(block, "type", None)
+        block_mapping.get("type") if block_mapping is not None else getattr(block, "type", None)
     )
-    text = (
-        block_mapping.get("text")
-        if block_mapping is not None
-        else getattr(block, "text", None)
-    )
+    text = block_mapping.get("text") if block_mapping is not None else getattr(block, "text", None)
     if block_type != "text" or not isinstance(text, str):
         return result_mapping if result_mapping is not None else None
     if len(text.encode("utf-8")) > _MAX_RESULT_BYTES:
@@ -444,7 +441,8 @@ class AsyncMcpClient:
         cls,
         endpoint: str | McpEndpoint,
         *,
-        bearer_token: AsyncBearerTokenProvider,
+        bearer_token: AsyncBearerTokenProvider | None = None,
+        session: AuthSession | None = None,
         timeout: float = 30.0,
     ) -> AsyncGenerator[AsyncMcpClient, None]:
         """Connect through the optional official Streamable HTTP transport."""
@@ -452,6 +450,7 @@ class AsyncMcpClient:
         async with open_streamable_http_transport(
             endpoint,
             bearer_token=bearer_token,
+            session=session,
             timeout=timeout,
         ) as transport:
             yield cls(transport)

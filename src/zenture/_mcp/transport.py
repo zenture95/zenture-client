@@ -7,10 +7,14 @@ import importlib
 import inspect
 from collections.abc import AsyncGenerator, Awaitable, Callable, Mapping
 from contextlib import AsyncExitStack, asynccontextmanager
-from typing import Any, Protocol, TypeAlias
+from typing import TYPE_CHECKING, Any, Protocol, TypeAlias
 
+from zenture._auth.errors import AuthError
 from zenture._mcp.contracts import BearerTokenProvider, McpEndpoint
 from zenture.errors import ZentureMCPDependencyError, ZentureMCPError
+
+if TYPE_CHECKING:
+    from zenture._auth.session import AuthSession
 
 AsyncBearerTokenProvider: TypeAlias = str | Callable[[], str | Awaitable[str]]
 
@@ -53,6 +57,23 @@ async def resolve_async_bearer_token(provider: AsyncBearerTokenProvider) -> str:
     return _validate_bearer_value(value)
 
 
+def _auth_failure(exc: BaseException, depth: int = 0) -> AuthError | None:
+    """Find an authorization failure raised inside the official client's task group."""
+
+    if isinstance(exc, AuthError):
+        return exc
+    if depth >= 4:
+        return None
+    children: list[BaseException] = list(getattr(exc, "exceptions", ()))
+    if exc.__cause__ is not None:
+        children.append(exc.__cause__)
+    for child in children:
+        found = _auth_failure(child, depth + 1)
+        if found is not None:
+            return found
+    return None
+
+
 def _validate_bearer_value(value: object) -> str:
     if not isinstance(value, str) or not value or value != value.strip() or len(value) > 4096:
         raise ValueError("bearer token must be a bounded non-empty value")
@@ -76,20 +97,25 @@ class _OfficialAsyncMcpTransport:
 async def open_streamable_http_transport(
     endpoint: str | McpEndpoint,
     *,
-    bearer_token: AsyncBearerTokenProvider,
+    bearer_token: AsyncBearerTokenProvider | None = None,
+    session: AuthSession | None = None,
     timeout: float = 30.0,
 ) -> AsyncGenerator[AsyncMcpTransport, None]:
     """Open an initialized official Streamable HTTP MCP client session.
 
     The optional ``mcp`` dependency is imported only when this explicit
     integration is opened. The yielded transport retains no credential beyond
-    the lifetime managed by the official session.
+    the lifetime managed by the official session. With ``session`` the
+    authorization session supplies a bearer per request (one serialized refresh
+    and retry on 401); ``session`` and ``bearer_token`` are mutually exclusive.
     """
 
+    if (session is None) == (bearer_token is None):
+        raise ValueError("pass exactly one of session or bearer_token")
     target = endpoint if isinstance(endpoint, McpEndpoint) else McpEndpoint.from_value(endpoint)
     if type(timeout) not in {int, float} or timeout <= 0 or timeout > 300:
         raise ValueError("timeout must be between 0 and 300 seconds")
-    token = await resolve_async_bearer_token(bearer_token)
+    token = await resolve_async_bearer_token(bearer_token) if bearer_token is not None else None
     try:
         mcp_module = importlib.import_module("mcp")
         streamable_http_module = importlib.import_module("mcp.client.streamable_http")
@@ -104,24 +130,26 @@ async def open_streamable_http_transport(
     yielded = False
     body_completed = False
     try:
+        client_options: dict[str, Any] = {
+            "timeout": timeout_type(timeout, read=timeout),
+            "follow_redirects": False,
+        }
+        if session is not None:
+            from zenture._auth.http_auth import SessionAuth
+
+            client_options["auth"] = SessionAuth(session)
+        else:
+            client_options = {"headers": {"Authorization": f"Bearer {token}"}, **client_options}
         async with AsyncExitStack() as stack:
-            http_client = await stack.enter_async_context(
-                async_client(
-                    headers={"Authorization": f"Bearer {token}"},
-                    timeout=timeout_type(timeout, read=timeout),
-                    follow_redirects=False,
-                )
-            )
+            http_client = await stack.enter_async_context(async_client(**client_options))
             streams = await stack.enter_async_context(
                 streamablehttp_client(target.url, http_client=http_client)
             )
             read_stream, write_stream = streams
-            session = await stack.enter_async_context(
-                client_session(read_stream, write_stream)
-            )
-            await session.initialize()
+            mcp_session = await stack.enter_async_context(client_session(read_stream, write_stream))
+            await mcp_session.initialize()
             yielded = True
-            yield _OfficialAsyncMcpTransport(session)
+            yield _OfficialAsyncMcpTransport(mcp_session)
             body_completed = True
     except asyncio.CancelledError:
         raise
@@ -130,6 +158,9 @@ async def open_streamable_http_transport(
     except Exception as exc:
         if body_completed:
             return
+        failure = _auth_failure(exc)
+        if failure is not None:
+            raise failure from None
         if yielded and not body_completed:
             raise
         raise ZentureMCPError(

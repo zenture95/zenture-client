@@ -26,6 +26,9 @@ classifiers = [
 dependencies = [
   "httpx>=0.27,<1",
   "pydantic>=2.7,<3",
+  "mcp>=2.0.0,<2.1",
+  "keyring>=25.6,<26",
+  "pyjwt[crypto]>=2.10,<3",
 ]
 
 [project.optional-dependencies]
@@ -74,11 +77,12 @@ include = [
 packages = ["src/zenture"]
 
 [tool.pytest.ini_options]
-addopts = ["--strict-config", "--strict-markers", "-m", "not real_e2e"]
+addopts = ["--strict-config", "--strict-markers", "-m", "not real_e2e and not native_keyring"]
 pythonpath = ["src"]
 testpaths = ["tests/unit", "tests/integration", "tests/e2e"]
 markers = [
   "real_e2e: explicit real MCP/API acceptance against an approved remote target",
+  "native_keyring: uses the real native credential store of the host OS (run with -m native_keyring)",
 ]
 
 [tool.mypy]

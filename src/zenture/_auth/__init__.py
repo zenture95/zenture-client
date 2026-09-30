@@ -1,0 +1,1 @@
+"""Internal native authorization core."""

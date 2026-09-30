@@ -112,7 +112,7 @@ def test_unsupported_platform_and_broken_import_are_store_unavailable(
         native_backend("linux")
 
 
-def test_keyring_store_keeps_one_item_per_issuer_resource_client() -> None:
+def test_keyring_store_keeps_one_item_per_resource_and_client() -> None:
     backend = FakeBackend()
     store = KeyringStore(backend)
     other = RecordKey(KEY.issuer, "https://mcp-int.zenture.app", KEY.client_id)

@@ -91,6 +91,7 @@ class FakeIssuer:
     device_requests: list[dict[str, str]] = field(default_factory=list)
     device_polls: list[dict[str, str]] = field(default_factory=list)
     device_interval: int = 5
+    device_verification_uri: str | None = None
     device_expires_in: int = 600
     user_code: str = "WDJBMJHT"
     _device_codes: dict[str, str] = field(default_factory=dict)
@@ -293,7 +294,7 @@ class FakeIssuer:
             {
                 "device_code": device_code,
                 "user_code": self.user_code,
-                "verification_uri": f"{self.issuer}/device",
+                "verification_uri": self.device_verification_uri or f"{self.issuer}/device",
                 "verification_uri_complete": f"{self.issuer}/device?user_code={self.user_code}",
                 "expires_in": self.device_expires_in,
                 "interval": self.device_interval,

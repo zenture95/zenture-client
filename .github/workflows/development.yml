@@ -84,15 +84,13 @@ jobs:
       - name: Coverage gate
         run: python -m coverage report
 
+  # Only a macOS Keychain test exists. Windows and Linux native tests do not exist yet,
+  # so this opt-in job runs on macOS only and makes no claim for other systems.
   native-keyring:
-    name: Native keyring (${{ matrix.os }})
+    name: Native keyring (macOS)
     if: github.event_name == 'workflow_dispatch'
-    runs-on: ${{ matrix.os }}
+    runs-on: macos-latest
     continue-on-error: false
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
     steps:
       - name: Check out repository
         uses: actions/checkout@v4

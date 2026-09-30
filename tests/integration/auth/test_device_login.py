@@ -80,7 +80,9 @@ def test_device_login_polls_with_interval_and_slow_down_then_stores_like_browser
         and p["resource"] == env.mcp.resource
         for p in polls
     )
-    assert clock.sleeps == [5, 5, 10]  # slow_down adds five seconds for every later poll
+    # 5 + 5 + 10 s (slow_down adds five seconds for every later poll), waited in short slices
+    assert max(clock.sleeps) <= 1.0
+    assert sum(clock.sleeps) == 20
     record = store.load(_key(env))
     assert record is not None
     assert record.state == "ready"
@@ -173,6 +175,67 @@ def test_terminal_poll_errors_require_starting_again(
     assert raised.value.code == code
     assert store.load(_key(env)) is None
     assert len(env.issuer.device_polls) == 1
+
+
+@pytest.mark.parametrize(
+    "uri",
+    [
+        "https://issuer.test/device\x1b[2J",
+        "https://issuer.test/device\nFake line",
+        "https://issuer.test/dev ice",
+        "https://issuer.test/device\u202e",
+    ],
+)
+def test_a_verification_uri_with_control_characters_is_never_shown(
+    env: Environment, store: RecordStore, lock_dir: Path, uri: str
+) -> None:
+    env.issuer.device_verification_uri = uri
+    shown = Shown()
+
+    with pytest.raises(AuthUnavailable) as raised:
+        _device_login(env, store, lock_dir, FakeClock(), shown)
+
+    assert raised.value.code == "device_authorization_invalid"
+    assert shown.prompts == []
+    assert env.issuer.device_polls == []
+
+
+def test_cancel_stops_a_long_poll_interval_within_one_second(
+    env: Environment, lock_dir: Path
+) -> None:
+    import threading
+
+    from zenture._auth.device import run_device_login
+    from zenture._auth.discovery import discover
+    from zenture._auth.http import new_client
+    from zenture._auth.model import Target
+    from zenture._auth.tokens import KeyCache
+
+    env.issuer.device_interval = 60
+    clock = FakeClock()
+    cancel = threading.Event()
+
+    def sleep(seconds: float) -> None:
+        clock.sleep(seconds)
+        if len(clock.sleeps) == 2:
+            cancel.set()
+
+    with new_client() as client:
+        discovery = discover(client, Target.from_endpoint(env.endpoint))
+        with pytest.raises(LoginCancelled):
+            run_device_login(
+                client,
+                discovery,
+                KeyCache(),
+                present=Shown(),
+                clock=clock,
+                sleep=sleep,
+                cancel=cancel,
+            )
+
+    assert max(clock.sleeps) <= 1.0  # never one blocking wait for the whole interval
+    assert sum(clock.sleeps) <= 2.0
+    assert env.issuer.device_polls == []
 
 
 def test_polling_stops_at_the_600_second_deadline(

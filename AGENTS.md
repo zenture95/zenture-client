@@ -145,7 +145,8 @@ New resources must include typed sync and async behavior, idempotency safety for
 mutating calls, no real network tests, and public-safe docs/examples when the
 usage surface changes.
 
-Examples must use `ZentureClient.from_env()` or `AsyncZentureClient.from_env()`.
+Examples must use `ZentureClient.from_env()` or `AsyncZentureClient.from_env()` for REST
+and the documented auth/MCP public APIs (`zenture.auth`, `zenture.mcp`) for sign-in and MCP.
 Mutating examples must pass explicit stable idempotency keys, preferably built with the
 SDK helper. Do not create tracked `.env` files.
 

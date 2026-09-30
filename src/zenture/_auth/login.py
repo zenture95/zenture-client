@@ -40,6 +40,7 @@ from zenture._auth.store import (
     native_store,
 )
 from zenture._auth.tokens import KeyCache, TokenSet, redeem_authorization_code
+from zenture.errors import ZentureMCPError
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -93,6 +94,12 @@ class Prepared:
         )
 
 
+def _mcp_unavailable() -> AuthUnavailable:
+    """The stored authorization stays; an MCP outage never justifies a new authorization."""
+
+    return AuthUnavailable("mcp_unavailable", next_action="retry_later")
+
+
 def _no_lock(_identity: RecordKey) -> contextlib.AbstractContextManager[None]:
     return contextlib.nullcontext()
 
@@ -113,6 +120,8 @@ class LoginFlow:
                 asyncio.run(self.probe(prepared))
             except AuthorizationRequired:
                 pass
+            except ZentureMCPError as exc:
+                raise _mcp_unavailable() from exc
             else:
                 return AuthSession(prepared.core)
             prepared = self._renew(prepared)
@@ -129,6 +138,8 @@ class LoginFlow:
                 await self.probe(prepared)
             except AuthorizationRequired:
                 pass
+            except ZentureMCPError as exc:
+                raise _mcp_unavailable() from exc
             else:
                 return AuthSession(prepared.core)
             prepared = await asyncio.to_thread(self._renew, prepared)

@@ -45,9 +45,9 @@ exit codes:
   3    authorization_required: log in again
   4    unavailable: nothing changed, try again later
   5    store_unavailable: no protected credential store (try --session-only)
-  6    login cancelled or stopped
+  6    login cancelled (denied or declined)
   7    permission denied by the server
-  130  interrupted
+  130  interrupted (Ctrl+C, also while waiting for a device login)
 """
 
 _REMOTE_NOTE = (
@@ -74,6 +74,10 @@ _EXPLANATIONS = {
         "The result of the device login could not be confirmed. Check your connections under "
         "zenture -> Zugriff & Sicherheit -> Verbindungen, then run "
         "`zenture auth login --device` again."
+    ),
+    "mcp_unavailable": (
+        "The zenture MCP endpoint could not be reached. Your stored authorization is "
+        "unchanged; try `zenture auth login` again later."
     ),
     "device_login_unsupported": "This server does not offer device login.",
     "login_cancelled": "The authorization was declined or cancelled; nothing was connected.",
@@ -147,7 +151,8 @@ def _build_parser() -> argparse.ArgumentParser:
 
 def _exit_code(exc: AuthError) -> int:
     if isinstance(exc, LoginCancelled):
-        return EXIT_CANCELLED
+        # Ctrl+C during device login exits like browser login and status; a denial stays 6.
+        return EXIT_INTERRUPTED if exc.code == "device_login_interrupted" else EXIT_CANCELLED
     if isinstance(exc, SecureStoreUnavailable):
         return EXIT_STORE_UNAVAILABLE
     if isinstance(exc, PermissionDenied):

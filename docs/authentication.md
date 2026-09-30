@@ -122,9 +122,10 @@ Access is refreshed automatically when it expires, with one refresh at a time
 per account even across several processes. A refresh replaces the stored
 credential. If a refresh is interrupted at a moment where the server may already
 have replaced it (for example the connection drops after the request was sent),
-the client cannot know which credential is valid. It then deletes the local
-record and raises `AuthorizationRequired`: you must log in again. It never
-reuses the old credential and never retries it.
+the client cannot know which credential is valid. The first interrupted refresh
+raises `AuthorizationRequired` (`rotation_outcome_unknown`) and marks the local
+record. The next attempt deletes that record and requires you to log in again.
+The client never reuses the old credential and never retries it.
 
 ### Status and removal
 

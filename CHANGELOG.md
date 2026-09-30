@@ -17,8 +17,8 @@
 - Added the public `zenture.mcp` module with `McpClient` and `AsyncMcpClient`
   exposing the six Run tools; the former `zenture._mcp` path is internal and no
   alias exists (hard cutover).
-- Declared CPython 3.14 support and run the CI matrix on 3.11 to 3.14 across
-  Linux, macOS and Windows.
+- Declared CPython 3.14 support and configured the CI matrix for 3.11 to 3.14
+  across Linux, macOS and Windows (configured, not yet run).
 
 All notable changes to `zenture-sdk` will be documented in this file.
 

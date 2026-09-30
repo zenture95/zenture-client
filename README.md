@@ -29,7 +29,7 @@ Candidate artifact checks do not establish public PyPI availability.
 - Import package: `zenture`
 - Sync client: `ZentureClient`
 - Async client: `AsyncZentureClient`
-- Supported Python: CPython 3.11, 3.12, 3.13, and 3.14 (Python 3.14 is declared and tested in CI; there is no upper version cap)
+- Supported Python: CPython 3.11, 3.12, 3.13, and 3.14 (Python 3.14 is declared; the CI matrix includes 3.14 (not yet run); there is no upper version cap)
 - Command line: `zenture`
 
 ## Installation
@@ -172,9 +172,9 @@ Import these from `zenture.auth`. Messages carry a fixed code, never a credentia
 | `3` | authorization_required: log in again |
 | `4` | unavailable: nothing changed, try again later |
 | `5` | store_unavailable: no protected credential store (try `--session-only`) |
-| `6` | login cancelled or stopped |
+| `6` | login cancelled (denied or declined) |
 | `7` | permission denied by the server |
-| `130` | interrupted |
+| `130` | interrupted (Ctrl+C, also while waiting for a device login) |
 
 Details: [`docs/authentication.md`](./docs/authentication.md) and
 [`docs/mcp-client.md`](./docs/mcp-client.md).

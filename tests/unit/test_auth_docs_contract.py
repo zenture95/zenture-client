@@ -222,5 +222,32 @@ def test_development_workflow_tests_the_full_platform_matrix_and_opt_in_native_k
     assert "if: github.event_name == 'workflow_dispatch'" in native
     assert "-m native_keyring" in native
     assert "continue-on-error: false" in native
-    for system in ("ubuntu-latest", "macos-latest", "windows-latest"):
-        assert system in native
+    # Only a macOS native-keychain test exists; no Windows/Linux native evidence is claimed.
+    assert "os: [" not in native
+    assert "matrix" not in native
+    assert "runs-on: macos-latest" in native
+    assert "ubuntu-latest" not in native
+    assert "windows-latest" not in native
+    assert "Windows and Linux native tests do not exist yet" in text
+
+
+def test_ci_and_python_support_wording_claims_nothing_that_was_not_run() -> None:
+    readme = _read(ROOT / "README.md")
+    changelog = _read(ROOT / "CHANGELOG.md")
+    assert "declared and tested in CI" not in readme
+    assert "CI matrix includes 3.14 (not yet run)" in readme
+    assert "run the CI matrix" not in changelog
+    assert "configured" in changelog
+
+
+def test_refresh_safety_docs_describe_mark_then_delete_on_the_next_attempt() -> None:
+    text = _read(ROOT / "docs" / "authentication.md")
+    section = text.split("### Refresh safety", 1)[1].split("###", 1)[0]
+    assert "rotation_outcome_unknown" in section
+    assert "marks" in section
+    assert "next attempt" in section
+
+
+def test_agent_contribution_rule_allows_the_documented_auth_and_mcp_apis() -> None:
+    agents = _read(ROOT / "AGENTS.md")
+    assert "documented auth/MCP public APIs" in agents

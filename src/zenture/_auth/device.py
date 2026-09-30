@@ -28,6 +28,7 @@ _MAX_INTERVAL = 60.0
 _SLOW_DOWN_STEP = 5.0
 _USER_CODE = re.compile(r"^[A-Za-z0-9]{8}$")
 _MAX_FIELD = 2048
+_WAIT_SLICE = 1.0
 
 
 @dataclass(frozen=True, slots=True, repr=False)
@@ -72,6 +73,12 @@ def _invalid() -> AuthUnavailable:
     return AuthUnavailable("device_authorization_invalid", next_action="retry_later")
 
 
+def _is_plain_text(value: str) -> bool:
+    """Printable and free of whitespace: nothing that could rewrite the terminal."""
+
+    return value.isprintable() and not any(ch.isspace() for ch in value)
+
+
 def _positive(value: object) -> float | None:
     if isinstance(value, bool) or not isinstance(value, int | float) or value <= 0:
         return None
@@ -103,6 +110,7 @@ def _start(client: httpx.Client, discovery: Discovery) -> _Authorization:
         and _USER_CODE.fullmatch(user_code.replace("-", ""))
         and isinstance(verification_uri, str)
         and len(verification_uri) <= _MAX_FIELD
+        and _is_plain_text(verification_uri)
         and is_secure_origin(verification_uri)
         and expires_in is not None
         and interval is not None
@@ -153,7 +161,7 @@ def run_device_login(
     }
     try:
         while True:
-            sleep(interval)
+            _wait(interval, sleep, clock, deadline, cancel)
             if cancel is not None and cancel.is_set():
                 raise LoginCancelled("device_login_interrupted")
             if clock() >= deadline:
@@ -177,6 +185,24 @@ def run_device_login(
                 raise _unknown_outcome()
     except KeyboardInterrupt:
         raise LoginCancelled("device_login_interrupted") from None
+
+
+def _wait(
+    interval: float,
+    sleep: Sleep,
+    clock: Clock,
+    deadline: float,
+    cancel: threading.Event | None,
+) -> None:
+    """Wait in short slices so a cancellation or the deadline stops polling within a second."""
+
+    remaining = interval
+    while remaining > 0:
+        step = min(_WAIT_SLICE, remaining)
+        sleep(step)
+        remaining -= step
+        if (cancel is not None and cancel.is_set()) or clock() >= deadline:
+            return
 
 
 def _poll(client: httpx.Client, discovery: Discovery, form: dict[str, str]) -> JsonResponse:

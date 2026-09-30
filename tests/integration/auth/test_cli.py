@@ -11,6 +11,7 @@ from typing import TYPE_CHECKING, Any
 import pytest
 from auth_harness import Environment, FakeClock, browser_opener, runtime_for
 
+from zenture._auth.login import LoginFlow
 from zenture._auth.model import CLIENT_ID
 from zenture._auth.store import RecordKey, StoreError
 from zenture.cli import main
@@ -127,7 +128,7 @@ def test_browser_that_cannot_open_suggests_device_login_and_does_not_start_one(
     assert _stored(file_store, env) is None
 
 
-def test_cancelled_device_login_exits_cancelled_and_states_the_request_simply_expires(
+def test_ctrl_c_during_device_login_exits_interrupted_and_states_the_request_simply_expires(
     env: Environment, file_store: FileStore, lock_dir: Path
 ) -> None:
     clock = FakeClock()
@@ -141,7 +142,7 @@ def test_cancelled_device_login_exits_cancelled_and_states_the_request_simply_ex
 
     result = run(["auth", "login", "--device"], runtime, env)
 
-    assert result.code == 6
+    assert result.code == 130  # Ctrl+C exits like browser login and status
     assert "simply expires" in result.err
     assert env.issuer.device_polls == []
 
@@ -153,7 +154,7 @@ def test_denied_device_login_exits_cancelled(
 
     result = run(["auth", "login", "--device"], _runtime(file_store, lock_dir), env)
 
-    assert result.code == 6
+    assert result.code == 6  # an explicit denial stays "cancelled"
     assert _stored(file_store, env) is None
 
 
@@ -247,6 +248,38 @@ def test_status_unavailable_when_the_mcp_probe_is_refused_with_a_server_error(
 
     assert result.code == 4
     assert "status: unavailable" in result.out
+
+
+@pytest.mark.parametrize("mode", ["server_error", "refused"])
+def test_login_with_a_stored_record_and_an_mcp_outage_exits_unavailable(
+    env: Environment,
+    file_store: FileStore,
+    lock_dir: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    mode: str,
+) -> None:
+    run(["auth", "login"], _runtime(file_store, lock_dir), env)
+    if mode == "server_error":
+        env.mcp.guard.forced = [503] * 20
+    else:
+
+        class RefusedAfterDiscovery(LoginFlow):
+            def prepare(self, *, session_only: bool, endpoint: str | None) -> Any:
+                prepared = super().prepare(session_only=session_only, endpoint=endpoint)
+                env.mcp.stop()
+                return prepared
+
+        monkeypatch.setattr("zenture.cli.LoginFlow", RefusedAfterDiscovery)
+    opener, opened = browser_opener()
+
+    result = run(["auth", "login"], _runtime(file_store, lock_dir, opener), env)
+
+    assert result.code == 4
+    assert "later" in result.err
+    assert "Traceback" not in result.text
+    assert opened == []
+    assert len(env.issuer.auth_requests) == 1
+    assert _stored(file_store, env) is not None
 
 
 def test_status_store_unavailable_when_the_credential_store_cannot_be_read(

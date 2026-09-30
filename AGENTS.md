@@ -33,9 +33,12 @@ Public product references:
   public `client.<resource>` attributes for operations, chat, input wizard,
   evaluations, models, billing, usage, limits, and helloworld.
 - `src/zenture/_transport/`: private sync/async `httpx` transport layer.
-- `src/zenture/_mcp/`: opt-in MCP client transport ports, official Streamable
-  HTTP binding and typed peer Run adapter; it owns no OAuth, Backend, Engine or
-  persistence authority.
+- `src/zenture/auth/`: public explicit login (`login`, `login_async`) and the
+  auth errors; implementation in private `src/zenture/_auth/`.
+- `src/zenture/mcp/`: public `McpClient` / `AsyncMcpClient`; implementation in
+  private `src/zenture/_mcp/` (transport ports, official Streamable HTTP binding,
+  typed Run adapter). It owns no Backend, Engine or persistence authority.
+- `src/zenture/cli.py`: the `zenture auth login|status|clear` command.
 - `src/zenture/_contract/`: internal OpenAPI-derived Pydantic models.
 - `src/zenture/errors.py`: typed SDK exceptions.
 - `src/zenture/polling.py`: polling policy primitives.
@@ -49,9 +52,11 @@ Only `ZentureClient`, `AsyncZentureClient`, and `__version__` are top-level
 public exports.
 Do not export internal `_contract` models from `zenture.__init__`.
 
-The `_mcp` namespace remains an opt-in implementation surface. Its bearer input
-is caller-provided;
-the SDK does not issue, refresh, revoke, persist or log MCP credentials.
+Public MCP/auth surface: `zenture.auth` (`login`, `login_async`, `AuthSession`,
+`AuthorizationRequired`, `AuthUnavailable`, `SecureStoreUnavailable`,
+`PermissionDenied`, `LoginCancelled`), `zenture.mcp` (`McpClient`,
+`AsyncMcpClient`) and the `zenture` command. `_auth`, `_mcp` and similar
+underscore namespaces are implementation details.
 
 Resource methods such as `client.chat.run(...)`, `client.models.list(...)`, and
 `client.operations.wait(...)` are the ergonomic public API. `_transport`,
@@ -83,6 +88,28 @@ repository's canonical contract models and both peer surfaces: the API
 resource and the opt-in MCP adapter. Add sync/async parity and cross-channel
 acceptance tests here before release promotion; do not create a workspace-only client duplicate or move Engine/business authority into the
 SDK.
+
+## Using zenture as an agent
+
+Contracts: [`README.md`](./README.md) (quickstart, errors, exit codes),
+[`docs/authentication.md`](./docs/authentication.md) and
+[`docs/mcp-client.md`](./docs/mcp-client.md).
+
+- Check the connection with `zenture auth status` (exit code 0 means connected).
+  Only a human at a terminal should run `zenture auth login`; explain what is
+  needed and stop instead of logging in on the user's behalf.
+- no implicit login: call `McpClient.connect()` / `AsyncMcpClient.connect()` with
+  the stored authorization and handle `AuthorizationRequired` by reporting
+  "run `zenture auth login`".
+- no private imports: use `zenture`, `zenture.auth`, `zenture.mcp` only, never
+  underscore modules of the package.
+- never print, log, store or paste tokens, refresh credentials, codes or
+  authorization URLs. Session objects are safe to print; do not try to extract
+  credentials from them.
+- Sync `McpClient` must not run inside a running event loop; use `AsyncMcpClient`.
+- Do not use `zenture auth clear` to revoke access; it is local only. Revocation
+  happens in zenture under Zugriff & Sicherheit -> Verbindungen.
+- A `run(idempotency_key=...)` parameter does not exist for MCP; do not invent it.
 
 ## Required Commands
 

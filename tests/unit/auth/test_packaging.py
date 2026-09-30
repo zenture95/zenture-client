@@ -35,7 +35,7 @@ def test_base_dependencies_carry_the_native_auth_stack() -> None:
         "keyring>=25.6,<26",
         "pyjwt[crypto]>=2.10,<3",
     } <= dependencies
-    assert not any("3.14" in classifier for classifier in project["classifiers"])
+    assert "Programming Language :: Python :: 3.14" in project["classifiers"]
     assert "\n.venv/\n" in "\n" + (ROOT / ".gitignore").read_text(encoding="utf-8")
 
 

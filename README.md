@@ -16,7 +16,9 @@ This is a hard source cutover: install `zenture` and import `ZentureClient` or
 `AsyncZenture` class names in application code; no legacy aliases are provided.
 The repository is `zenture95/zenture-client`. API-token access and the existing
 caller-provided bearer MCP adapter retain their behavior. OAuth discovery,
-login, refresh and credential storage are not implemented by this client.
+login, refresh and credential storage are implemented by this client for the
+hosted MCP endpoint (see [MCP and native login](#mcp-and-native-login)); API
+tokens stay a separate credential.
 Previously published artifacts remain the return path if the source migration
 cannot yet be applied; do not install both distributions into one environment.
 Candidate artifact checks do not establish public PyPI availability.
@@ -27,7 +29,8 @@ Candidate artifact checks do not establish public PyPI availability.
 - Import package: `zenture`
 - Sync client: `ZentureClient`
 - Async client: `AsyncZentureClient`
-- Supported Python: Python 3.11, 3.12, and 3.13
+- Supported Python: CPython 3.11, 3.12, 3.13, and 3.14 (Python 3.14 is declared and tested in CI; there is no upper version cap)
+- Command line: `zenture`
 
 ## Installation
 
@@ -35,8 +38,18 @@ Candidate artifact checks do not establish public PyPI availability.
 pip install zenture
 ```
 
-Until the public beta is published to PyPI, use the internally shared wheel or
-release artifact from the repository owner.
+`zenture` is not published to PyPI yet, so `pip install zenture` will only work
+after the first public release. Until then install from a checkout of this
+repository (or from a wheel the repository owner gives you):
+
+```bash
+git clone https://github.com/zenture95/zenture-client.git
+cd zenture-client
+python -m pip install .
+```
+
+The installation includes the `zenture` command and the `zenture.auth` and
+`zenture.mcp` modules; no extra is needed.
 
 ## Authentication
 
@@ -61,6 +74,110 @@ The SDK intentionally does not parse `.env` files. Load environment variables
 through your runtime, deployment platform, secrets manager, or preferred local
 loader. Public SDK usage targets the production API origin:
 `https://api.zenture.app`.
+
+## MCP and native login
+
+Besides the REST client, `zenture` talks to the hosted zenture MCP endpoint as a
+peer channel. It authorizes *you* (a zenture account), not an API token: nothing
+is read from `ZENTURE_API_KEY` and the REST client is unchanged.
+
+Log in once from a terminal:
+
+```bash
+zenture auth login                 # opens your browser (PKCE, loopback redirect)
+zenture auth login --device        # headless: shows a code to enter on another device
+zenture auth login --session-only  # verify the login but store nothing
+zenture auth status                # verify the stored authorization
+zenture auth clear                 # delete the local record only
+```
+
+- **Explicit login only.** Ordinary calls such as `McpClient.connect()` never open a
+  browser and never start a login. Without a usable authorization they raise
+  `AuthorizationRequired`; you decide when to run `zenture auth login`.
+- **One stored account.** This machine keeps one stored account per user profile
+  (one stored account, one connection). Logging in again replaces it.
+- **Device login** waits at most 10 minutes for approval and is never started
+  automatically when the browser is unavailable.
+- **`zenture auth clear` is local.** It deletes only the record on this machine.
+  Revoke the connection itself in zenture under
+  *Zugriff & Sicherheit -> Verbindungen*.
+- **Secure storage.** The authorization is kept in the operating system's
+  credential store. `--session-only` / `session_only=True` keeps it in memory for
+  the current process instead.
+
+| Platform | Credential store | Status |
+|---|---|---|
+| macOS | Keychain | proven |
+| Windows | Credential Manager | implemented, not yet verified |
+| Linux | Secret Service (for example GNOME Keyring) | implemented, not yet verified |
+
+The six MCP tools are `run`, `attach_artifact`, `list_runs`, `get_run`,
+`cancel_run` and `record_run_outcome`, available on both peers.
+
+Synchronous (from ordinary code, not from inside a running event loop):
+
+```python
+from zenture.mcp import McpClient
+
+with McpClient.connect() as client:  # uses the stored authorization
+    client.require_product_tools()
+    run = client.run(
+        task="Review the selected answer",
+        artifact={"type": "text", "value": "selected answer"},
+    )
+    print(client.get_run(run.run_id).run.status)
+```
+
+Asynchronous, with an explicit login in the same program:
+
+```python
+import asyncio
+
+from zenture.auth import login_async
+from zenture.mcp import AsyncMcpClient
+
+
+async def main() -> None:
+    with await login_async() as session:
+        async with AsyncMcpClient.connect(session=session) as client:
+            page = await client.list_runs(limit=5)
+            print(len(page.runs))
+
+
+asyncio.run(main())
+```
+
+Runnable variants live in [`examples/`](./examples/): `mcp_async_login.py`,
+`mcp_sync_stored_login.py` and `mcp_device_login.py` (each supports `--help`).
+
+### Errors and next actions
+
+Import these from `zenture.auth`. Messages carry a fixed code, never a credential.
+
+| Error | Meaning | What to do |
+|---|---|---|
+| `AuthorizationRequired` | No stored authorization, or it can no longer be used (for example after an interrupted refresh or a revoked connection) | Run `zenture auth login` |
+| `AuthUnavailable` | Authorization could not be checked now; the stored state is unchanged | Try again later |
+| `SecureStoreUnavailable` | No protected credential store on this system | Use `zenture auth login --session-only` |
+| `PermissionDenied` | The server refused access for this authorization (HTTP 403) | Contact the zenture account owner; logging in again does not widen access |
+| `LoginCancelled` | The authorization was declined, cancelled or stopped | Nothing was connected; run the login again if you meant it |
+
+### Exit codes
+
+| Code | Meaning |
+|---|---|
+| `0` | success (status: connected) |
+| `1` | status: not_logged_in |
+| `2` | invalid command line |
+| `3` | authorization_required: log in again |
+| `4` | unavailable: nothing changed, try again later |
+| `5` | store_unavailable: no protected credential store (try `--session-only`) |
+| `6` | login cancelled or stopped |
+| `7` | permission denied by the server |
+| `130` | interrupted |
+
+Details: [`docs/authentication.md`](./docs/authentication.md) and
+[`docs/mcp-client.md`](./docs/mcp-client.md).
 
 ## Local Scratch Workspace
 
@@ -89,8 +206,9 @@ For copy-paste SDK usage, routes, and example response structures for every
 public call, see [`docs/sdk-call-reference.md`](./docs/sdk-call-reference.md).
 For raw JSON response bodies and SDK model mapping, see
 [`docs/response-shapes.md`](./docs/response-shapes.md).
-The opt-in MCP peer adapter is documented in
-[`docs/mcp-client.md`](./docs/mcp-client.md).
+The MCP peer clients are documented in
+[`docs/mcp-client.md`](./docs/mcp-client.md) and native login in
+[`docs/authentication.md`](./docs/authentication.md).
 
 ## Agent And Interface Governance
 

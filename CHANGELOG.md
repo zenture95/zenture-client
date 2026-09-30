@@ -5,7 +5,20 @@
 - Rename the repository to `zenture-client`, the distribution to `zenture`, and
   public API classes to `ZentureClient` / `AsyncZentureClient` without aliases.
 - Preserve API-token resource behavior and caller-provided bearer MCP support;
-  OAuth and public package publication remain outside this source cutover.
+  Public package publication remains outside this source cutover.
+- Added native authorization for the hosted MCP endpoint: explicit browser
+  (PKCE, loopback) and headless device login through `zenture.auth.login` /
+  `login_async`, secure credential storage (macOS Keychain proven; Windows
+  Credential Manager and Linux Secret Service implemented, not yet verified)
+  with a session-only mode, and safe refresh that requires a new login after an
+  interrupted refresh.
+- Added the `zenture` command: `zenture auth login [--device] [--session-only]`,
+  `zenture auth status` and `zenture auth clear` with documented exit codes.
+- Added the public `zenture.mcp` module with `McpClient` and `AsyncMcpClient`
+  exposing the six Run tools; the former `zenture._mcp` path is internal and no
+  alias exists (hard cutover).
+- Declared CPython 3.14 support and run the CI matrix on 3.11 to 3.14 across
+  Linux, macOS and Windows.
 
 All notable changes to `zenture-sdk` will be documented in this file.
 

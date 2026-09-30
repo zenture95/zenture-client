@@ -20,6 +20,7 @@ ROOT = Path(__file__).resolve().parents[2]
 
 DOC_FILES = [
     ROOT / "docs" / "authentication.md",
+    ROOT / "docs" / "mcp-client.md",
     ROOT / "docs" / "idempotency.md",
     ROOT / "docs" / "async-operations.md",
     ROOT / "docs" / "errors.md",
@@ -48,7 +49,18 @@ EXAMPLE_FILES = [
     ROOT / "examples" / "account_status.py",
     ROOT / "examples" / "end_to_end_chat_evaluation.py",
 ]
-PUBLIC_TEXT_FILES = [ROOT / "README.md", ROOT / "AGENTS.md", *DOC_FILES, *EXAMPLE_FILES]
+MCP_EXAMPLE_FILES = [
+    ROOT / "examples" / "mcp_async_login.py",
+    ROOT / "examples" / "mcp_sync_stored_login.py",
+    ROOT / "examples" / "mcp_device_login.py",
+]
+PUBLIC_TEXT_FILES = [
+    ROOT / "README.md",
+    ROOT / "AGENTS.md",
+    *DOC_FILES,
+    *EXAMPLE_FILES,
+    *MCP_EXAMPLE_FILES,
+]
 FORBIDDEN_PATTERNS = [
     re.compile("zt_" + "live_"),
     re.compile("zt_" + "test_"),

@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import re
-from collections.abc import AsyncGenerator, Iterable, Mapping, Sequence
-from contextlib import asynccontextmanager
+from collections.abc import AsyncGenerator, Generator, Iterable, Mapping, Sequence
+from contextlib import asynccontextmanager, contextmanager
 from typing import TYPE_CHECKING, Any, Literal, TypeVar, cast
 
 from pydantic import BaseModel, ValidationError
@@ -271,11 +272,69 @@ def _list_arguments(
     return cast("dict[str, object]", request.model_dump(mode="json", exclude_none=True))
 
 
+class _PortalTransport:
+    """Synchronous port that runs every call on the background loop of one portal."""
+
+    def __init__(self, portal: Any, transport: AsyncMcpTransport) -> None:
+        self._portal = portal
+        self._transport = transport
+
+    def list_tools(self) -> object:
+        return self._portal.call(self._transport.list_tools)
+
+    def call_tool(self, name: str, arguments: Mapping[str, object]) -> object:
+        return self._portal.call(self._transport.call_tool, name, arguments)
+
+
+def _reject_running_event_loop() -> None:
+    try:
+        asyncio.get_running_loop()
+    except RuntimeError:
+        return
+    raise RuntimeError(
+        "McpClient is synchronous and cannot run inside an event loop; "
+        "use AsyncMcpClient.connect() with 'async with' instead"
+    )
+
+
 class McpClient:
     """Synchronous MCP peer adapter over one caller-owned transport."""
 
     def __init__(self, transport: SyncMcpTransport) -> None:
         self._transport = transport
+
+    @classmethod
+    @contextmanager
+    def connect(
+        cls,
+        endpoint: str | McpEndpoint | None = None,
+        *,
+        session: AuthSession | None = None,
+        bearer_token: AsyncBearerTokenProvider | None = None,
+        timeout: float = 30.0,
+    ) -> Generator[McpClient, None, None]:
+        """Connect like :meth:`AsyncMcpClient.connect` on a dedicated background event loop.
+
+        The same asynchronous implementation runs on a loop thread that is
+        stopped, with the transport closed, when the context exits.
+        """
+
+        _reject_running_event_loop()
+        from anyio.from_thread import start_blocking_portal
+
+        with start_blocking_portal() as portal:
+            opened = AsyncMcpClient.connect(
+                endpoint, session=session, bearer_token=bearer_token, timeout=timeout
+            )
+            failure: BaseException | None = None
+            with portal.wrap_async_context_manager(opened) as peer:
+                try:
+                    yield cls(_PortalTransport(portal, peer._transport))
+                except BaseException as exc:
+                    # Close the loop side cleanly; the caller sees its own exception unwrapped.
+                    failure = exc
+            if failure is not None:
+                raise failure
 
     def list_tools(self) -> tuple[str, ...]:
         try:
@@ -439,21 +498,39 @@ class AsyncMcpClient:
     @asynccontextmanager
     async def connect(
         cls,
-        endpoint: str | McpEndpoint,
+        endpoint: str | McpEndpoint | None = None,
         *,
-        bearer_token: AsyncBearerTokenProvider | None = None,
         session: AuthSession | None = None,
+        bearer_token: AsyncBearerTokenProvider | None = None,
         timeout: float = 30.0,
     ) -> AsyncGenerator[AsyncMcpClient, None]:
-        """Connect through the optional official Streamable HTTP transport."""
+        """Connect through the official Streamable HTTP transport.
 
-        async with open_streamable_http_transport(
-            endpoint,
-            bearer_token=bearer_token,
-            session=session,
-            timeout=timeout,
-        ) as transport:
-            yield cls(transport)
+        With neither ``session`` nor ``bearer_token`` the stored authorization
+        of the endpoint is used; this never starts a login and raises
+        ``AuthorizationRequired`` when no authorization is stored.
+        """
+
+        from zenture._auth.model import DEFAULT_ENDPOINT
+
+        target = DEFAULT_ENDPOINT if endpoint is None else endpoint
+        owned: AuthSession | None = None
+        if session is None and bearer_token is None:
+            from zenture._auth.stored import open_stored_session
+
+            url = target.url if isinstance(target, McpEndpoint) else target
+            owned = session = await asyncio.to_thread(open_stored_session, url)
+        try:
+            async with open_streamable_http_transport(
+                target,
+                bearer_token=bearer_token,
+                session=session,
+                timeout=timeout,
+            ) as transport:
+                yield cls(transport)
+        finally:
+            if owned is not None:
+                owned.close()
 
     async def list_tools(self) -> tuple[str, ...]:
         try:

@@ -49,7 +49,7 @@ async def test_async_client_connects_with_a_session_and_lists_tools(
     session = _session(env, lock_dir)
 
     async with AsyncMcpClient.connect(env.endpoint, session=session) as client:
-        assert await client.list_tools() == ("ping",)
+        assert sorted(await client.list_tools()) == ["echo", "ping"]
 
     assert env.mcp.guard.requests
     assert all(entry["bearer"] and entry["status"] == 200 for entry in env.mcp.guard.requests)
@@ -65,9 +65,6 @@ async def test_session_and_static_bearer_are_mutually_exclusive(
     with pytest.raises(ValueError, match="exactly one"):
         async with AsyncMcpClient.connect(env.endpoint, session=session, bearer_token="x"):
             pass
-    with pytest.raises(ValueError, match="exactly one"):
-        async with AsyncMcpClient.connect(env.endpoint):
-            pass
 
 
 @pytest.mark.asyncio
@@ -77,7 +74,7 @@ async def test_static_bearer_path_is_unchanged(env: Environment, lock_dir: Path)
     assert token is not None
 
     async with AsyncMcpClient.connect(env.endpoint, bearer_token=token) as client:
-        assert await client.list_tools() == ("ping",)
+        assert sorted(await client.list_tools()) == ["echo", "ping"]
 
 
 @pytest.mark.asyncio

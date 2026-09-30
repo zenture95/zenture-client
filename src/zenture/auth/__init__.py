@@ -21,16 +21,19 @@ from zenture._auth.session import AuthSession
 def login(
     *, device: bool = False, session_only: bool = False, endpoint: str | None = None
 ) -> AuthSession:
-    """Authorize through the system browser and return an opaque session.
+    """Authorize through the system browser (or ``device=True``) and return a session.
+
+    ``device=True`` starts the explicit headless RFC 8628 flow: the verification
+    address and a one-time code are shown on the terminal and the call waits,
+    at most ten minutes, for approval on another device. It is never started
+    automatically when the browser is unavailable.
 
     A stored authorization is reused after one refresh and an authenticated
     probe; only when it is no longer usable does a new browser authorization
     start. ``session_only=True`` keeps every credential in memory.
     """
 
-    if device:
-        raise NotImplementedError("device login is not available yet")
-    return LoginFlow().login(session_only=session_only, endpoint=endpoint)
+    return LoginFlow().login(device=device, session_only=session_only, endpoint=endpoint)
 
 
 async def login_async(
@@ -38,9 +41,9 @@ async def login_async(
 ) -> AuthSession:
     """Asynchronous form of :func:`login`."""
 
-    if device:
-        raise NotImplementedError("device login is not available yet")
-    return await LoginFlow().login_async(session_only=session_only, endpoint=endpoint)
+    return await LoginFlow().login_async(
+        device=device, session_only=session_only, endpoint=endpoint
+    )
 
 
 __all__ = [

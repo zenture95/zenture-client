@@ -25,10 +25,11 @@ socket.getaddrinfo = record("getaddrinfo")
 # Modules whose use would mean a browser launch, a credential-store access or network client.
 for blocked in ("webbrowser", "keyring", "httpx2", "mcp"):
     sys.modules[blocked] = None
-import zenture, zenture.auth
+import zenture, zenture.auth, zenture.mcp, zenture.cli
 assert events == [], events
 assert zenture.auth.login and zenture.auth.login_async and zenture.auth.AuthSession
-for name in ("AuthorizationRequired", "AuthUnavailable", "SecureStoreUnavailable", "LoginCancelled"):
+assert zenture.mcp.McpClient and zenture.mcp.AsyncMcpClient and zenture.cli.main
+for name in ("AuthorizationRequired", "AuthUnavailable", "SecureStoreUnavailable", "LoginCancelled", "PermissionDenied"):
     assert issubclass(getattr(zenture.auth, name), Exception)
 print("clean")
 """

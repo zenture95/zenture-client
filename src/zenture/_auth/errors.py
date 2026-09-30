@@ -15,10 +15,13 @@ class AuthError(ZentureError):
     default_code = "auth_error"
     default_action = "check_request"
 
-    def __init__(self, code: str | None = None, *, next_action: str | None = None) -> None:
+    def __init__(
+        self, code: str | None = None, *, next_action: str | None = None, hint: str | None = None
+    ) -> None:
         self.code = code or self.default_code
         self.next_action = next_action or self.default_action
-        super().__init__(f"{type(self).__name__}: {self.code}")
+        message = f"{type(self).__name__}: {self.code}"
+        super().__init__(f"{message} ({hint})" if hint else message)
 
 
 class AuthorizationRequired(AuthError):

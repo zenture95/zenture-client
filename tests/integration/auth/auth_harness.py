@@ -7,6 +7,7 @@ and revocation of the whole grant when a consumed refresh token is presented.
 
 from __future__ import annotations
 
+import asyncio
 import contextlib
 import json
 import re
@@ -34,6 +35,8 @@ if TYPE_CHECKING:
 
     from zenture._auth.store import RecordStore
 
+HANG = 599  # forced status: the request is recorded, then never answered in time
+DEVICE_GRANT = "urn:ietf:params:oauth:grant-type:device_code"
 REDIRECT_PATTERN = re.compile(r"^http://(127\.0\.0\.1|\[::1\]):\d+/oauth/callback$")
 
 
@@ -82,6 +85,13 @@ class FakeIssuer:
     _thread: threading.Thread | None = None
     jwks_key: Any = None
     refresh_delay: float = 0.0
+    device_script: list[str] = field(default_factory=list)
+    device_requests: list[dict[str, str]] = field(default_factory=list)
+    device_polls: list[dict[str, str]] = field(default_factory=list)
+    device_interval: int = 5
+    device_expires_in: int = 600
+    user_code: str = "WDJBMJHT"
+    _device_codes: dict[str, str] = field(default_factory=dict)
 
     @property
     def issuer(self) -> str:
@@ -244,7 +254,11 @@ class FakeIssuer:
     def _post(self, handler: BaseHTTPRequestHandler) -> None:
         length = int(handler.headers.get("Content-Length", "0"))
         form = dict(urllib.parse.parse_qsl(handler.rfile.read(length).decode()))
-        if urllib.parse.urlsplit(handler.path).path != "/token":
+        path = urllib.parse.urlsplit(handler.path).path
+        if path == "/device/auth":
+            self._device_authorization(handler, form)
+            return
+        if path != "/token":
             self._json(handler, 404, {"error": "not_found"})
             return
         self.token_requests.append(dict(form.items()))
@@ -252,8 +266,58 @@ class FakeIssuer:
             self._redeem(handler, form)
         elif form.get("grant_type") == "refresh_token":
             self._rotate(handler, form)
+        elif form.get("grant_type") == DEVICE_GRANT:
+            self._device_poll(handler, form)
         else:
             self._json(handler, 400, {"error": "unsupported_grant_type"})
+
+    def _device_authorization(self, handler: BaseHTTPRequestHandler, form: dict[str, str]) -> None:
+        self.device_requests.append(dict(form.items()))
+        if (
+            form.get("client_id") != CLIENT_ID
+            or form.get("scope") != "openid mcp:run offline_access"
+            or form.get("resource") != self.resource
+        ):
+            self._json(handler, 400, {"error": "invalid_request"})
+            return
+        device_code = "dc_" + secrets.token_urlsafe(24)
+        with self._lock:
+            self._device_codes[device_code] = "open"
+        self._json(
+            handler,
+            200,
+            {
+                "device_code": device_code,
+                "user_code": self.user_code,
+                "verification_uri": f"{self.issuer}/device",
+                "verification_uri_complete": f"{self.issuer}/device?user_code={self.user_code}",
+                "expires_in": self.device_expires_in,
+                "interval": self.device_interval,
+            },
+        )
+
+    def _device_poll(self, handler: BaseHTTPRequestHandler, form: dict[str, str]) -> None:
+        self.device_polls.append(dict(form.items()))
+        with self._lock:
+            state = self._device_codes.get(form.get("device_code", ""))
+            step = self.device_script.pop(0) if self.device_script else "authorization_pending"
+        if state != "open" or form.get("client_id") != CLIENT_ID:
+            self._json(handler, 400, {"error": "invalid_grant"})
+            return
+        if step == "drop":
+            with self._lock:
+                self._device_codes[form["device_code"]] = "consumed"
+            handler.connection.close()
+            return
+        if step == "server_error":
+            self._json(handler, 503, {"error": "temporarily_unavailable"})
+            return
+        if step == "approve":
+            with self._lock:
+                self._device_codes[form["device_code"]] = "consumed"
+            self._issue_first_tokens(handler)
+            return
+        self._json(handler, 400, {"error": step})
 
     def _redeem(self, handler: BaseHTTPRequestHandler, form: dict[str, str]) -> None:
         import base64
@@ -272,6 +336,9 @@ class FakeIssuer:
         ):
             self._json(handler, 400, {"error": "invalid_grant"})
             return
+        self._issue_first_tokens(handler)
+
+    def _issue_first_tokens(self, handler: BaseHTTPRequestHandler) -> None:
         grant = IssuedGrant(
             grant_id=secrets.token_hex(6),
             sub="user-1",
@@ -359,6 +426,7 @@ class _Guard:
         self._issuer = issuer
         self._metadata = resource_metadata
         self.forced: list[int] = []
+        self.forced_tool_calls: list[int] = []
         self.requests: list[dict[str, Any]] = []
 
     async def __call__(self, scope: Any, receive: Any, send: Any) -> None:
@@ -379,15 +447,44 @@ class _Guard:
             )
             await send({"type": "http.response.body", "body": body})
             return
+        body = b""
+        more = True
+        while more:
+            message = await receive()
+            body += message.get("body", b"")
+            more = message.get("more_body", False)
+        delivered = False
+
+        async def replay() -> Any:
+            nonlocal delivered
+            if delivered:
+                return await receive()
+            delivered = True
+            return {"type": "http.request", "body": body, "more_body": False}
+
+        try:
+            rpc = json.loads(body).get("method", "")
+        except (ValueError, AttributeError):
+            rpc = ""
         headers = {k.decode().lower(): v.decode() for k, v in scope["headers"]}
         authorization = headers.get("authorization", "")
         token = authorization[7:] if authorization.startswith("Bearer ") else ""
         status = self.forced.pop(0) if self.forced else 0
+        if rpc == "tools/call" and self.forced_tool_calls:
+            status = self.forced_tool_calls.pop(0)
         if status == 0 and not self._issuer.accepts(token):
             status = 401
         self.requests.append(
-            {"method": scope["method"], "bearer": bool(token), "status": status or 200}
+            {
+                "method": scope["method"],
+                "bearer": bool(token),
+                "status": status or 200,
+                "rpc": rpc,
+            }
         )
+        if status == HANG:
+            await asyncio.sleep(3)
+            status = 504
         if status:
             challenge = (
                 f'Bearer error="invalid_token", resource_metadata="{self._metadata}", '
@@ -406,7 +503,7 @@ class _Guard:
             )
             await send({"type": "http.response.body", "body": b"{}"})
             return
-        await self._app(scope, receive, send)
+        await self._app(scope, replay, send)
 
 
 class FakeMcp:
@@ -424,6 +521,10 @@ class FakeMcp:
         @server.tool()
         def ping() -> str:
             return "pong"
+
+        @server.tool()
+        def echo() -> dict[str, str]:
+            return {"state": "done"}
 
         self.guard = _Guard(
             server.streamable_http_app(
@@ -506,3 +607,18 @@ def browser_opener(
 def runtime_for(store: RecordStore, lock_dir: Path, opener: Any, **extra: Any) -> Runtime:
     options: dict[str, Any] = {"native_store": lambda: store, "lock_directory": lock_dir, **extra}
     return Runtime(opener=opener, **options)
+
+
+class FakeClock:
+    """Deterministic monotonic clock whose ``sleep`` advances it instantly."""
+
+    def __init__(self) -> None:
+        self.now = 1000.0
+        self.sleeps: list[float] = []
+
+    def __call__(self) -> float:
+        return self.now
+
+    def sleep(self, seconds: float) -> None:
+        self.sleeps.append(seconds)
+        self.now += seconds

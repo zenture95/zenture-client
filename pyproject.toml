@@ -47,6 +47,9 @@ dev = [
   "coverage[toml]>=7.6",
 ]
 
+[project.scripts]
+zenture = "zenture.cli:main"
+
 [project.urls]
 Homepage = "https://www.zenture.app/about"
 Repository = "https://github.com/zenture95/zenture-client"

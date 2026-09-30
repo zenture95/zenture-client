@@ -74,6 +74,21 @@ def _auth_failure(exc: BaseException, depth: int = 0) -> AuthError | None:
     return None
 
 
+def _leaves(exc: BaseException, depth: int = 0) -> list[BaseException]:
+    children: list[BaseException] = list(getattr(exc, "exceptions", ()))
+    if not children or depth >= 4:
+        return [exc]
+    return [leaf for child in children for leaf in _leaves(child, depth + 1)]
+
+
+def _is_network_failure(exc: BaseException, network_error: type[BaseException] | None) -> bool:
+    """Whether every leaf of a task-group failure is a transport error of the HTTP stack."""
+
+    if network_error is None:
+        return False
+    return all(isinstance(leaf, network_error) for leaf in _leaves(exc))
+
+
 def _validate_bearer_value(value: object) -> str:
     if not isinstance(value, str) or not value or value != value.strip() or len(value) > 4096:
         raise ValueError("bearer token must be a bounded non-empty value")
@@ -161,7 +176,11 @@ async def open_streamable_http_transport(
         failure = _auth_failure(exc)
         if failure is not None:
             raise failure from None
-        if yielded and not body_completed:
+        if (
+            yielded
+            and not body_completed
+            and not _is_network_failure(exc, getattr(httpx2_module, "HTTPError", None))
+        ):
             raise
         raise ZentureMCPError(
             "mcp_transport_unavailable",

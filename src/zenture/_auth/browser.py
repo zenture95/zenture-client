@@ -70,7 +70,7 @@ def bind_loopback() -> tuple[socket.socket, str]:
             continue
         port = listener.getsockname()[1]
         return listener, f"http://{display}:{port}{CALLBACK_PATH}"
-    raise AuthUnavailable("loopback_unavailable") from last_error
+    raise AuthUnavailable("loopback_unavailable", next_action="use_device_login") from last_error
 
 
 def pkce_pair() -> tuple[str, str]:

@@ -6,6 +6,7 @@ import asyncio
 import contextlib
 import secrets
 import threading
+import time
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
@@ -16,6 +17,13 @@ from zenture._auth.browser import (
     bind_loopback,
     pkce_pair,
     wait_for_callback,
+)
+from zenture._auth.device import (
+    Clock,
+    Presenter,
+    Sleep,
+    run_device_login,
+    terminal_presenter,
 )
 from zenture._auth.discovery import Discovery, discover
 from zenture._auth.errors import AuthorizationRequired, AuthUnavailable, SecureStoreUnavailable
@@ -57,10 +65,19 @@ class Runtime:
     lock_wait_seconds: float = LOCK_WAIT_SECONDS
     login_timeout: float = LOGIN_TIMEOUT_SECONDS
     probe_timeout: float = 30.0
+    presenter: Presenter = terminal_presenter
+    clock: Clock = time.monotonic
+    sleep: Sleep = time.sleep
+
+
+def default_runtime() -> Runtime:
+    """Production environment of every login, status and stored-session operation."""
+
+    return Runtime()
 
 
 @dataclass(slots=True)
-class _Prepared:
+class Prepared:
     discovery: Discovery
     store: RecordStore
     lock: LockFactory
@@ -84,30 +101,32 @@ class LoginFlow:
     """Login orchestration over an injectable :class:`Runtime`."""
 
     def __init__(self, runtime: Runtime | None = None) -> None:
-        self._runtime = runtime or Runtime()
+        self._runtime = runtime or default_runtime()
 
     # -- public entry points ---------------------------------------------------------
-    def login(self, *, session_only: bool = False, endpoint: str | None = None) -> AuthSession:
-        prepared = self._prepare(session_only=session_only, endpoint=endpoint)
+    def login(
+        self, *, device: bool = False, session_only: bool = False, endpoint: str | None = None
+    ) -> AuthSession:
+        prepared = self.prepare(session_only=session_only, endpoint=endpoint)
         if not session_only and self._reuse(prepared):
             try:
-                asyncio.run(self._probe(prepared))
+                asyncio.run(self.probe(prepared))
             except AuthorizationRequired:
                 pass
             else:
                 return AuthSession(prepared.core)
             prepared = self._renew(prepared)
-        return self._browser(prepared, threading.Event())
+        return self._authorize(prepared, device, threading.Event())
 
     async def login_async(
-        self, *, session_only: bool = False, endpoint: str | None = None
+        self, *, device: bool = False, session_only: bool = False, endpoint: str | None = None
     ) -> AuthSession:
         prepared = await asyncio.to_thread(
-            self._prepare, session_only=session_only, endpoint=endpoint
+            self.prepare, session_only=session_only, endpoint=endpoint
         )
         if not session_only and await asyncio.to_thread(self._reuse, prepared):
             try:
-                await self._probe(prepared)
+                await self.probe(prepared)
             except AuthorizationRequired:
                 pass
             else:
@@ -115,20 +134,20 @@ class LoginFlow:
             prepared = await asyncio.to_thread(self._renew, prepared)
         cancel = threading.Event()
         try:
-            return await asyncio.to_thread(self._browser, prepared, cancel)
+            return await asyncio.to_thread(self._authorize, prepared, device, cancel)
         except asyncio.CancelledError:
             cancel.set()
             raise
 
     # -- steps -----------------------------------------------------------------------
-    def _prepare(self, *, session_only: bool, endpoint: str | None) -> _Prepared:
+    def prepare(self, *, session_only: bool, endpoint: str | None) -> Prepared:
         runtime = self._runtime
         target = Target.from_endpoint(endpoint)
         with runtime.http() as client:
             discovery = discover(client, target)
         if session_only:
             store: RecordStore = MemoryStore()
-            return _Prepared(discovery=discovery, store=store, lock=_no_lock, runtime=runtime)
+            return Prepared(discovery=discovery, store=store, lock=_no_lock, runtime=runtime)
         store = runtime.native_store()
         directory = runtime.lock_directory
 
@@ -137,19 +156,19 @@ class LoginFlow:
                 identity, directory=directory, wait_seconds=runtime.lock_wait_seconds
             )
 
-        return _Prepared(discovery=discovery, store=store, lock=lock, runtime=runtime)
+        return Prepared(discovery=discovery, store=store, lock=lock, runtime=runtime)
 
-    def _renew(self, prepared: _Prepared) -> _Prepared:
+    def _renew(self, prepared: Prepared) -> Prepared:
         """Fresh session state for a new authorization after a failed reuse."""
 
-        return _Prepared(
+        return Prepared(
             discovery=prepared.discovery,
             store=prepared.store,
             lock=prepared.lock,
             runtime=prepared.runtime,
         )
 
-    def _reuse(self, prepared: _Prepared) -> bool:
+    def _reuse(self, prepared: Prepared) -> bool:
         """D-35: refresh a stored ready record once; ``False`` leads to browser login."""
 
         identity = prepared.core.identity
@@ -165,7 +184,7 @@ class LoginFlow:
             return False
         return True
 
-    async def _probe(self, prepared: _Prepared) -> None:
+    async def probe(self, prepared: Prepared) -> None:
         """Authenticated, non-activity MCP ``initialize`` + ``tools/list`` probe."""
 
         from zenture._mcp.client import AsyncMcpClient
@@ -177,7 +196,33 @@ class LoginFlow:
         ) as client:
             await client.list_tools()
 
-    def _browser(self, prepared: _Prepared, cancel: threading.Event) -> AuthSession:
+    def _authorize(self, prepared: Prepared, device: bool, cancel: threading.Event) -> AuthSession:
+        if device:
+            return self._device(prepared, cancel)
+        return self._browser(prepared, cancel)
+
+    def _device(self, prepared: Prepared, cancel: threading.Event) -> AuthSession:
+        runtime = prepared.runtime
+        keys = KeyCache()
+        with runtime.http() as client:
+            tokens = run_device_login(
+                client,
+                prepared.discovery,
+                keys,
+                present=runtime.presenter,
+                clock=runtime.clock,
+                sleep=runtime.sleep,
+                cancel=cancel,
+            )
+        return self._adopt(prepared, tokens, keys)
+
+    def _adopt(self, prepared: Prepared, tokens: TokenSet, keys: KeyCache) -> AuthSession:
+        self._persist(prepared, tokens)
+        prepared.core.keys = keys
+        prepared.core.adopt(tokens)
+        return AuthSession(prepared.core)
+
+    def _browser(self, prepared: Prepared, cancel: threading.Event) -> AuthSession:
         discovery = prepared.discovery
         runtime = prepared.runtime
         verifier, challenge = pkce_pair()
@@ -211,12 +256,9 @@ class LoginFlow:
                 verifier=callback.verifier,
                 redirect_uri=callback.redirect_uri,
             )
-        self._persist(prepared, tokens)
-        prepared.core.keys = keys
-        prepared.core.adopt(tokens)
-        return AuthSession(prepared.core)
+        return self._adopt(prepared, tokens, keys)
 
-    def _persist(self, prepared: _Prepared, tokens: TokenSet) -> None:
+    def _persist(self, prepared: Prepared, tokens: TokenSet) -> None:
         identity = RecordKey(prepared.discovery.issuer, prepared.discovery.resource, CLIENT_ID)
         record = StoredRecord(identity, tokens.binding, tokens.refresh_token, state="ready")
         try:

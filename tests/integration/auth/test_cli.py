@@ -18,6 +18,8 @@ from zenture.cli import main
 from zenture.errors import ZentureMCPDependencyError, ZentureMCPError, ZentureMCPProtocolError
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
     from file_store import FileStore
 
     from zenture._auth.login import Runtime
@@ -48,7 +50,9 @@ def _key(env: Environment) -> RecordKey:
     return RecordKey(env.issuer.issuer, env.mcp.resource, CLIENT_ID)
 
 
-def _runtime(file_store: FileStore, lock_dir: Path, opener: Any = None, **kw: Any) -> Runtime:
+def _runtime(
+    file_store: FileStore, lock_dir: Path, opener: Callable[[str], object] | None = None, **kw: Any
+) -> Runtime:
     clock = FakeClock()
     chosen = opener or browser_opener()[0]
     return runtime_for(file_store, lock_dir, chosen, clock=clock, sleep=clock.sleep, **kw)
@@ -62,7 +66,8 @@ def _assert_no_credentials(env: Environment, file_store: FileStore, result: Resu
     record = _stored(file_store, env)
     assert record is not None
     assert record.refresh_token not in result.text
-    for token in env.issuer._access:
+    # Inspect synthetic issuer token state for the secret hygiene oracle.
+    for token in env.issuer._access:  # pyright: ignore[reportPrivateUsage]
         assert token not in result.text
 
 
@@ -121,7 +126,10 @@ def test_session_only_login_verifies_but_persists_nothing_and_says_so(
 def test_browser_that_cannot_open_suggests_device_login_and_does_not_start_one(
     env: Environment, file_store: FileStore, lock_dir: Path
 ) -> None:
-    result = run(["auth", "login"], _runtime(file_store, lock_dir, lambda _url: False), env)
+    def unavailable_browser(_url: str) -> bool:
+        return False
+
+    result = run(["auth", "login"], _runtime(file_store, lock_dir, unavailable_browser), env)
 
     assert result.code == 4
     assert "zenture auth login --device" in result.err
@@ -304,7 +312,11 @@ def test_login_probe_dependency_or_protocol_error_is_not_reported_as_try_later(
     error: ZentureMCPError,
 ) -> None:
     run(["auth", "login"], _runtime(file_store, lock_dir), env)
-    monkeypatch.setattr("zenture.cli.LoginFlow", lambda runtime: _ProbeFails(runtime, error))
+
+    def probe_flow(runtime: Runtime) -> _ProbeFails:
+        return _ProbeFails(runtime, error)
+
+    monkeypatch.setattr("zenture.cli.LoginFlow", probe_flow)
     opener, opened = browser_opener()
 
     result = run(["auth", "login"], _runtime(file_store, lock_dir, opener), env)
@@ -346,13 +358,13 @@ def test_status_store_unavailable_when_the_credential_store_cannot_be_read(
     env: Environment, lock_dir: Path
 ) -> None:
     class Broken:
-        def load(self, _identity: RecordKey) -> None:
+        def load(self, identity: RecordKey) -> None:
             raise StoreError
 
-        def save(self, _record: object) -> None:
+        def save(self, record: StoredRecord) -> None:
             raise StoreError
 
-        def delete(self, _identity: RecordKey) -> bool:
+        def delete(self, identity: RecordKey) -> bool:
             raise StoreError
 
     opener, _ = browser_opener()

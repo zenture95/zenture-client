@@ -24,6 +24,7 @@ import httpx
 import jwt
 import uvicorn
 from cryptography.hazmat.primitives.asymmetric import ec
+from jwt.algorithms import ECAlgorithm
 from mcp.server.mcpserver import MCPServer
 
 from zenture._auth.login import Runtime
@@ -58,8 +59,8 @@ class FakeIssuer:
     resource: str = ""
     kid: str = "test-key"
     access_ttl: int = 300
-    metadata_overrides: dict[str, Any] = field(default_factory=dict)
-    prm_overrides: dict[str, Any] = field(default_factory=dict)
+    metadata_overrides: dict[str, Any] = field(default_factory=dict[str, Any])
+    prm_overrides: dict[str, Any] = field(default_factory=dict[str, Any])
     response_iss: str | None = None  # None -> correct issuer
     omit_iss: bool = False
     deny: bool = False
@@ -67,34 +68,36 @@ class FakeIssuer:
     access_audience: str | None = None
     access_client_id: str = CLIENT_ID
     forge_access: Callable[[FakeIssuer, dict[str, Any]], str] | None = None
-    next_connection_ids: list[str] = field(default_factory=list)
-    refresh_behaviors: list[str] = field(default_factory=list)
+    next_connection_ids: list[str] = field(default_factory=list[str])
+    refresh_behaviors: list[str] = field(default_factory=list[str])
     refresh_hold: threading.Event = field(default_factory=threading.Event)
     refresh_seen: threading.Event = field(default_factory=threading.Event)
-    auth_requests: list[dict[str, str]] = field(default_factory=list)
-    token_requests: list[dict[str, str]] = field(default_factory=list)
-    refresh_requests: list[str] = field(default_factory=list)
+    auth_requests: list[dict[str, str]] = field(default_factory=list[dict[str, str]])
+    token_requests: list[dict[str, str]] = field(default_factory=list[dict[str, str]])
+    refresh_requests: list[str] = field(default_factory=list[str])
     reuse_events: int = 0
     concurrent_refreshes: int = 0
     max_concurrent_refreshes: int = 0
-    _codes: dict[str, dict[str, str]] = field(default_factory=dict)
-    _refresh: dict[str, tuple[IssuedGrant, bool]] = field(default_factory=dict)
-    _grants: dict[str, IssuedGrant] = field(default_factory=dict)
-    _access: dict[str, float] = field(default_factory=dict)
+    _codes: dict[str, dict[str, str]] = field(default_factory=dict[str, dict[str, str]])
+    _refresh: dict[str, tuple[IssuedGrant, bool]] = field(
+        default_factory=dict[str, tuple[IssuedGrant, bool]]
+    )
+    _grants: dict[str, IssuedGrant] = field(default_factory=dict[str, IssuedGrant])
+    _access: dict[str, float] = field(default_factory=dict[str, float])
     _lock: threading.Lock = field(default_factory=threading.Lock)
     _key: Any = field(default_factory=lambda: ec.generate_private_key(ec.SECP256R1()))
     _server: ThreadingHTTPServer | None = None
     _thread: threading.Thread | None = None
     jwks_key: Any = None
     refresh_delay: float = 0.0
-    device_script: list[str] = field(default_factory=list)
-    device_requests: list[dict[str, str]] = field(default_factory=list)
-    device_polls: list[dict[str, str]] = field(default_factory=list)
+    device_script: list[str] = field(default_factory=list[str])
+    device_requests: list[dict[str, str]] = field(default_factory=list[dict[str, str]])
+    device_polls: list[dict[str, str]] = field(default_factory=list[dict[str, str]])
     device_interval: int = 5
     device_verification_uri: str | None = None
     device_expires_in: int = 600
     user_code: str = "WDJBMJHT"
-    _device_codes: dict[str, str] = field(default_factory=dict)
+    _device_codes: dict[str, str] = field(default_factory=dict[str, str])
 
     @property
     def issuer(self) -> str:
@@ -106,7 +109,7 @@ class FakeIssuer:
         class Handler(BaseHTTPRequestHandler):
             protocol_version = "HTTP/1.1"
 
-            def log_message(self, *_args: object) -> None:
+            def log_message(self, format: str, *args: object) -> None:
                 return
 
             def do_GET(self) -> None:
@@ -153,9 +156,7 @@ class FakeIssuer:
         return {**base, **self.prm_overrides}
 
     def jwks(self) -> dict[str, Any]:
-        public = jwt.algorithms.ECAlgorithm.to_jwk(
-            (self.jwks_key or self._key).public_key(), as_dict=True
-        )
+        public = ECAlgorithm.to_jwk((self.jwks_key or self._key).public_key(), as_dict=True)
         return {"keys": [{**public, "kid": self.kid, "use": "sig", "alg": "ES256"}]}
 
     def accepts(self, token: str) -> bool:

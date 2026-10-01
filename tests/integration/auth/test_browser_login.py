@@ -356,11 +356,10 @@ def test_native_store_unavailable_fails_before_the_browser_opens(
     def unavailable() -> RecordStore:
         raise SecureStoreUnavailable
 
-    flow = LoginFlow(
-        runtime_for(
-            MemoryStore(), lock_dir, lambda url: opened.append(url), native_store=unavailable
-        )
-    )
+    def record_browser(url: str) -> None:
+        opened.append(url)
+
+    flow = LoginFlow(runtime_for(MemoryStore(), lock_dir, record_browser, native_store=unavailable))
     with pytest.raises(SecureStoreUnavailable) as caught:
         flow.login(endpoint=env.endpoint)
 

@@ -82,7 +82,10 @@ async def test_async_peer_without_credentials_uses_the_stored_binding_non_intera
 async def test_async_peer_without_credentials_or_record_requires_login(
     env: Environment, lock_dir: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    runtime = runtime_for(MemoryStore(), lock_dir, lambda _url: pytest.fail("browser started"))
+    def unexpected_browser(_url: str) -> None:
+        pytest.fail("browser started")
+
+    runtime = runtime_for(MemoryStore(), lock_dir, unexpected_browser)
     monkeypatch.setattr(login_module, "default_runtime", lambda: runtime)
 
     with pytest.raises(AuthorizationRequired) as raised:
@@ -121,7 +124,8 @@ def test_sync_peer_accepts_a_static_bearer_and_rejects_session_plus_bearer(
     env: Environment, lock_dir: Path
 ) -> None:
     session = _login(env, MemoryStore(), lock_dir)
-    token = session._core._access
+    # Inspect the owned test session credential cache for the auth invariant.
+    token = session._core._access  # pyright: ignore[reportPrivateUsage]
     assert token is not None
 
     with McpClient.connect(env.endpoint, bearer_token=token) as client:
@@ -199,7 +203,8 @@ async def test_server_failure_on_a_tool_call_is_never_retried(
         env.mcp.guard.requests.clear()
         env.mcp.guard.forced_tool_calls = [503]
         with pytest.raises(ZentureMCPError):
-            await client._call("echo", {})
+            # Call the internal tool seam to prove failure, timeout, and retry behavior.
+            await client._call("echo", {})  # pyright: ignore[reportPrivateUsage]
 
     assert _tool_calls(env) == [503]
     assert env.issuer.refresh_requests == []
@@ -209,7 +214,8 @@ async def _call_that_times_out(env: Environment, session: AuthSession) -> None:
     async with AsyncMcpClient.connect(env.endpoint, session=session, timeout=0.5) as client:
         env.mcp.guard.requests.clear()
         env.mcp.guard.forced_tool_calls = [HANG]
-        await client._call("echo", {})
+        # Call the internal tool seam to prove failure, timeout, and retry behavior.
+        await client._call("echo", {})  # pyright: ignore[reportPrivateUsage]
 
 
 @pytest.mark.asyncio
@@ -232,7 +238,8 @@ async def test_auth_rejected_tool_call_is_retried_exactly_once_after_one_refresh
     async with AsyncMcpClient.connect(env.endpoint, session=session) as client:
         env.mcp.guard.requests.clear()
         env.mcp.guard.forced_tool_calls = [401]
-        result = await client._call("echo", {})
+        # Call the internal tool seam to prove failure, timeout, and retry behavior.
+        result = await client._call("echo", {})  # pyright: ignore[reportPrivateUsage]
 
     assert result == {"state": "done"}
     assert _tool_calls(env) == [401, 200]

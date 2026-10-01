@@ -315,7 +315,7 @@ def test_sync_iter_events_stops_immediately_at_lifecycle_terminal(status: str) -
     )
     messages = list(client.runs.iter_events(RUN_ID, initial_interval=0.0, max_interval=0.0))
 
-    statuses = []
+    statuses: list[str] = []
     for message in messages:
         assert isinstance(message, PublicRunEvent)
         statuses.append(message.status)
@@ -345,7 +345,7 @@ def test_sync_iter_events_keeps_cancel_requested_nonterminal() -> None:
     )
     messages = list(client.runs.iter_events(RUN_ID, initial_interval=0.0, max_interval=0.0))
 
-    statuses = []
+    statuses: list[str] = []
     for message in messages:
         assert isinstance(message, PublicRunEvent)
         statuses.append(message.status)
@@ -1479,10 +1479,14 @@ def test_sync_wait_reports_deadline_when_terminal_response_crosses_explicit_time
 
     now = 1_000.0
     deadline_at = "1970-01-01T00:33:20Z"
+
+    def sleep(_seconds: float) -> None:
+        pass
+
     monkeypatch.setattr(
         runs_module,
         "time",
-        SimpleNamespace(monotonic=lambda: now, time=lambda: now, sleep=lambda _seconds: None),
+        SimpleNamespace(monotonic=lambda: now, time=lambda: now, sleep=sleep),
     )
 
     def handler(_request: httpx.Request) -> httpx.Response:

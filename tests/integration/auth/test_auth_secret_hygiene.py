@@ -29,14 +29,17 @@ def test_reprs_errors_logs_and_output_never_contain_secrets(
     caplog.set_level(logging.DEBUG, logger="zenture")
 
     session = LoginFlow(runtime_for(store, lock_dir, opener)).login(endpoint=env.endpoint)
-    core = session._core
+    # Inspect the owned test session credential cache for the auth invariant.
+    core = session._core  # pyright: ignore[reportPrivateUsage]
     identity = core.identity
     record = store.load(identity)
     assert record is not None
-    assert core._access is not None
+    # Inspect the owned test session credential cache for the auth invariant.
+    assert core._access is not None  # pyright: ignore[reportPrivateUsage]
     query = dict(urllib.parse.parse_qsl(urllib.parse.urlsplit(opened[0]).query))
     secrets_seen = {
-        core._access,
+        # Inspect the owned test session credential cache for the auth invariant.
+        core._access,  # pyright: ignore[reportPrivateUsage]
         record.refresh_token,
         query["state"],
         query["code_challenge"],

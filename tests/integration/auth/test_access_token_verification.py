@@ -30,7 +30,11 @@ def _b64(data: bytes) -> str:
 
 def _es256(issuer: FakeIssuer, claims: dict[str, Any], **headers: Any) -> str:
     return jwt.encode(
-        claims, issuer._key, algorithm="ES256", headers={"kid": issuer.kid, **headers}
+        # Inspect the synthetic issuer signing key to forge verification cases.
+        claims,
+        issuer._key,  # pyright: ignore[reportPrivateUsage]
+        algorithm="ES256",
+        headers={"kid": issuer.kid, **headers},
     )
 
 
@@ -55,7 +59,8 @@ def hs256_with_public_jwk(issuer: FakeIssuer, claims: dict[str, Any]) -> str:
 
 
 def missing_kid(issuer: FakeIssuer, claims: dict[str, Any]) -> str:
-    return jwt.encode(claims, issuer._key, algorithm="ES256")
+    # Inspect the synthetic issuer signing key to forge verification cases.
+    return jwt.encode(claims, issuer._key, algorithm="ES256")  # pyright: ignore[reportPrivateUsage]
 
 
 def other_algorithm(issuer: FakeIssuer, claims: dict[str, Any]) -> str:

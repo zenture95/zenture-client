@@ -88,9 +88,10 @@ def test_non_viable_backend_suggests_session_only(
     class Dead:
         viable = False
 
-    monkeypatch.setattr(
-        importlib, "import_module", lambda _n: SimpleNamespace(Keyring=Dead, WinVaultKeyring=Dead)
-    )
+    def dead_backend(_name: str) -> SimpleNamespace:
+        return SimpleNamespace(Keyring=Dead, WinVaultKeyring=Dead)
+
+    monkeypatch.setattr(importlib, "import_module", dead_backend)
 
     with pytest.raises(SecureStoreUnavailable) as caught:
         native_backend(platform)

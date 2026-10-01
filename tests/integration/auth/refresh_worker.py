@@ -7,6 +7,7 @@ import json
 import sys
 import time
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from file_store import FileStore
 
@@ -17,6 +18,9 @@ from zenture._auth.lock import binding_lock
 from zenture._auth.model import Target
 from zenture._auth.session import SessionCore
 
+if TYPE_CHECKING:
+    from zenture._auth.store import RecordKey
+
 
 def main() -> None:
     config = json.loads(sys.argv[1])
@@ -24,7 +28,7 @@ def main() -> None:
         discovery = discover(client, Target.from_endpoint(config["endpoint"]))
     directory = Path(config["lock_dir"])
 
-    def lock(identity):  # type: ignore[no-untyped-def]
+    def lock(identity: RecordKey) -> contextlib.AbstractContextManager[None]:
         if config.get("no_lock"):
             return contextlib.nullcontext()
         return binding_lock(identity, directory=directory, wait_seconds=60)

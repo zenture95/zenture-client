@@ -66,7 +66,11 @@ async def test_async_peer_refuses_a_foreign_endpoint_without_sending_a_bearer(
     env: Environment, other: Environment, lock_dir: Path
 ) -> None:
     session = _session(env, lock_dir)
-    session._core.clock = lambda: session._core._expires_at + 1  # a token fetch would refresh
+    # Expire the owned test session to exercise refresh and binding guards.
+    # a token fetch would refresh
+    session._core.clock = (  # pyright: ignore[reportPrivateUsage]
+        lambda: session._core._expires_at + 1  # pyright: ignore[reportPrivateUsage]
+    )
 
     for url in _foreign_urls(env, other):
         with pytest.raises(ValueError, match="resource"):
@@ -80,7 +84,8 @@ def test_sync_peer_refuses_a_foreign_endpoint_without_sending_a_bearer(
     env: Environment, other: Environment, lock_dir: Path
 ) -> None:
     session = _session(env, lock_dir)
-    session._core.clock = lambda: session._core._expires_at + 1
+    # Expire the owned test session to exercise refresh and binding guards.
+    session._core.clock = lambda: session._core._expires_at + 1  # pyright: ignore[reportPrivateUsage]
 
     for url in _foreign_urls(env, other):
         with pytest.raises(ValueError, match="resource"), McpClient.connect(url, session=session):
@@ -94,7 +99,8 @@ async def test_async_auth_flow_checks_every_request_before_fetching_a_token(
     env: Environment, other: Environment, lock_dir: Path
 ) -> None:
     session = _session(env, lock_dir)
-    session._core.clock = lambda: session._core._expires_at + 1
+    # Expire the owned test session to exercise refresh and binding guards.
+    session._core.clock = lambda: session._core._expires_at + 1  # pyright: ignore[reportPrivateUsage]
 
     async with httpx2.AsyncClient(auth=SessionAuth(session)) as client:
         for url in _foreign_urls(env, other)[:2]:
@@ -109,7 +115,8 @@ def test_sync_auth_flow_checks_every_request_before_fetching_a_token(
     env: Environment, other: Environment, lock_dir: Path
 ) -> None:
     session = _session(env, lock_dir)
-    session._core.clock = lambda: session._core._expires_at + 1
+    # Expire the owned test session to exercise refresh and binding guards.
+    session._core.clock = lambda: session._core._expires_at + 1  # pyright: ignore[reportPrivateUsage]
 
     with httpx2.Client(auth=SessionAuth(session)) as client:
         for url in _foreign_urls(env, other)[:2]:

@@ -102,6 +102,15 @@ def _coerce_aware_datetime(value: object) -> object:
     return parsed
 
 
+def _has_unsafe_artifact_ref(values: object) -> bool:
+    if not isinstance(values, tuple):
+        return False
+    return any(
+        not isinstance(item, str) or _SAFE_ARTIFACT_REF_RE.fullmatch(item) is None
+        for item in cast("tuple[object, ...]", values)
+    )
+
+
 def _coerce_tuple(value: object) -> object:
     if isinstance(value, list):
         return tuple(cast("list[object]", value))
@@ -723,10 +732,7 @@ class SafeResultCoverageItem(_RunResponseModel):
     @classmethod
     def _artifact_refs(cls, value: object) -> object:
         values = _coerce_tuple(value)
-        if isinstance(values, tuple) and any(
-            not isinstance(item, str) or _SAFE_ARTIFACT_REF_RE.fullmatch(item) is None
-            for item in values
-        ):
+        if _has_unsafe_artifact_ref(values):
             raise ValueError("artifact_refs must contain compiler-safe references")
         return values
 

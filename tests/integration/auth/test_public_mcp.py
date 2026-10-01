@@ -121,7 +121,7 @@ def test_sync_peer_accepts_a_static_bearer_and_rejects_session_plus_bearer(
     env: Environment, lock_dir: Path
 ) -> None:
     session = _login(env, MemoryStore(), lock_dir)
-    token = session._core._access
+    token = session._core._access  # pyright: ignore[reportPrivateUsage]  # white-box test of internals
     assert token is not None
 
     with McpClient.connect(env.endpoint, bearer_token=token) as client:
@@ -199,7 +199,7 @@ async def test_server_failure_on_a_tool_call_is_never_retried(
         env.mcp.guard.requests.clear()
         env.mcp.guard.forced_tool_calls = [503]
         with pytest.raises(ZentureMCPError):
-            await client._call("echo", {})
+            await client._call("echo", {})  # pyright: ignore[reportPrivateUsage]  # white-box test of internals
 
     assert _tool_calls(env) == [503]
     assert env.issuer.refresh_requests == []
@@ -209,7 +209,7 @@ async def _call_that_times_out(env: Environment, session: AuthSession) -> None:
     async with AsyncMcpClient.connect(env.endpoint, session=session, timeout=0.5) as client:
         env.mcp.guard.requests.clear()
         env.mcp.guard.forced_tool_calls = [HANG]
-        await client._call("echo", {})
+        await client._call("echo", {})  # pyright: ignore[reportPrivateUsage]  # white-box test of internals
 
 
 @pytest.mark.asyncio
@@ -232,7 +232,7 @@ async def test_auth_rejected_tool_call_is_retried_exactly_once_after_one_refresh
     async with AsyncMcpClient.connect(env.endpoint, session=session) as client:
         env.mcp.guard.requests.clear()
         env.mcp.guard.forced_tool_calls = [401]
-        result = await client._call("echo", {})
+        result = await client._call("echo", {})  # pyright: ignore[reportPrivateUsage]  # white-box test of internals
 
     assert result == {"state": "done"}
     assert _tool_calls(env) == [401, 200]

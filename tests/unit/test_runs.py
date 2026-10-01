@@ -1489,10 +1489,14 @@ def test_sync_wait_reports_deadline_when_terminal_response_crosses_explicit_time
 
     now = 1_000.0
     deadline_at = "1970-01-01T00:33:20Z"
+
+    def no_sleep(_seconds: float) -> None:
+        return None
+
     monkeypatch.setattr(
         runs_module,
         "time",
-        SimpleNamespace(monotonic=lambda: now, time=lambda: now, sleep=lambda _seconds: None),
+        SimpleNamespace(monotonic=lambda: now, time=lambda: now, sleep=no_sleep),
     )
 
     def handler(_request: httpx.Request) -> httpx.Response:

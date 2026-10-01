@@ -1237,7 +1237,10 @@ async def test_official_transport_preserves_body_failures(
                 async def __aenter__(self) -> tuple[object, object]:
                     return object(), object()
 
-            return SimpleNamespace(streamable_http_client=lambda *_args, **_kwargs: StreamContext())
+            def streamable_http_client(*_args: object, **_kwargs: object) -> StreamContext:
+                return StreamContext()
+
+            return SimpleNamespace(streamable_http_client=streamable_http_client)
         if name == "httpx2":
 
             class Timeout:
@@ -1291,7 +1294,11 @@ async def test_official_transport_does_not_fail_after_successful_body_on_close_e
         if name == "mcp":
             return SimpleNamespace(ClientSession=Session)
         if name == "mcp.client.streamable_http":
-            return SimpleNamespace(streamable_http_client=lambda *_args, **_kwargs: FailingStream())
+
+            def streamable_http_client(*_args: object, **_kwargs: object) -> FailingStream:
+                return FailingStream()
+
+            return SimpleNamespace(streamable_http_client=streamable_http_client)
         if name == "httpx2":
 
             class Timeout:

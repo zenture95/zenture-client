@@ -16,7 +16,7 @@ if TYPE_CHECKING:
 
 
 def _core(session: AuthSession) -> SessionCore:
-    return session._core
+    return session._core  # pyright: ignore[reportPrivateUsage]  # package-internal access
 
 
 class SessionAuth(httpx2.Auth):

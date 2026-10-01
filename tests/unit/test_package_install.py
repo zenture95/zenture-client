@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import site
 import subprocess
 import sys
@@ -42,6 +43,20 @@ asyncio.run(main())
 """
 
 
+def _venv_python(location: Path) -> Path:
+    return location / ("Scripts" if os.name == "nt" else "bin") / "python"
+
+
+def _venv_site_packages(python: Path) -> Path:
+    queried = subprocess.run(
+        [str(python), "-c", "import sysconfig; print(sysconfig.get_path('purelib'))"],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    return Path(queried.stdout.strip())
+
+
 def _run(arguments: list[str], *, cwd: Path) -> None:
     result = subprocess.run(arguments, cwd=cwd, capture_output=True, check=False)
     assert result.returncode == 0, "Package build/install/behavior check failed"
@@ -65,14 +80,9 @@ def test_built_wheel_and_sdist_install_canonical_client(tmp_path: Path) -> None:
         # Reuse the locked local dependency runtime without network access;
         # package installation itself is fresh and must resolve from this venv.
         venv.EnvBuilder(with_pip=True, system_site_packages=True).create(location)
-        packages = (
-            location
-            / "lib"
-            / f"python{sys.version_info.major}.{sys.version_info.minor}"
-            / "site-packages"
-        )
+        python = _venv_python(location)
+        packages = _venv_site_packages(python)
         (packages / "dependency-runtime.pth").write_text("\n".join(site.getsitepackages()))
-        python = location / "bin" / "python"
         _run(
             [
                 str(python),

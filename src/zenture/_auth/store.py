@@ -8,7 +8,7 @@ import json
 import sys
 import threading
 from dataclasses import dataclass, replace
-from typing import Any, Literal, Protocol
+from typing import Any, Literal, Protocol, cast
 
 from zenture._auth.errors import SecureStoreUnavailable
 from zenture._auth.model import Binding
@@ -97,8 +97,11 @@ class StoredRecord:
         """Parse a stored record; anything malformed or foreign reads as absent."""
 
         try:
-            data = json.loads(raw)
-            if not isinstance(data, dict) or data.get("v") != RECORD_VERSION:
+            parsed: object = json.loads(raw)
+            if not isinstance(parsed, dict):
+                return None
+            data = cast("dict[str, Any]", parsed)
+            if data.get("v") != RECORD_VERSION:
                 return None
             claimed = (data["issuer"], data["resource"], data["client_id"])
             if claimed != (identity.issuer, identity.resource, identity.client_id):

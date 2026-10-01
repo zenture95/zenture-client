@@ -70,7 +70,7 @@ async def test_session_and_static_bearer_are_mutually_exclusive(
 @pytest.mark.asyncio
 async def test_static_bearer_path_is_unchanged(env: Environment, lock_dir: Path) -> None:
     session = _session(env, lock_dir)
-    token = session._core._access
+    token = session._core._access  # pyright: ignore[reportPrivateUsage]  # white-box test of internals
     assert token is not None
 
     async with AsyncMcpClient.connect(env.endpoint, bearer_token=token) as client:
@@ -156,7 +156,7 @@ async def test_expired_cached_access_token_is_refreshed_before_the_request(
     env: Environment, lock_dir: Path
 ) -> None:
     session = _session(env, lock_dir)
-    session._core.clock = lambda: session._core._expires_at + 1
+    session._core.clock = lambda: session._core._expires_at + 1  # pyright: ignore[reportPrivateUsage]  # white-box test of internals
 
     async with httpx2.AsyncClient(auth=SessionAuth(session)) as client:
         response = await _post(client, env)

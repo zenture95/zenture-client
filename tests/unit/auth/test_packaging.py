@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import email
+import os
 import site
 import subprocess
 import sys
@@ -20,6 +21,20 @@ from pathlib import Path
 assert Path(zenture.__file__).is_relative_to(Path(sys.prefix))
 assert zenture.auth.login and zenture.auth.login_async
 """
+
+
+def _venv_python(location: Path) -> Path:
+    return location / ("Scripts" if os.name == "nt" else "bin") / "python"
+
+
+def _venv_site_packages(python: Path) -> Path:
+    queried = subprocess.run(
+        [str(python), "-c", "import sysconfig; print(sysconfig.get_path('purelib'))"],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    return Path(queried.stdout.strip())
 
 
 def test_base_dependencies_carry_the_native_auth_stack() -> None:
@@ -64,9 +79,9 @@ def test_built_wheel_declares_the_dependencies_and_imports_in_a_fresh_environmen
     location = tmp_path / "fresh"
     # Fresh interpreter environment; the locked local dependency runtime stands in for PyPI.
     venv.EnvBuilder(with_pip=True, system_site_packages=True).create(location)
-    packages = next((location / "lib").glob("python*/site-packages"))
+    python = _venv_python(location)
+    packages = _venv_site_packages(python)
     (packages / "dependency-runtime.pth").write_text("\n".join(site.getsitepackages()))
-    python = location / "bin" / "python"
     subprocess.run(
         [
             str(python),

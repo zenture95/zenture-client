@@ -14,12 +14,13 @@ from zenture._auth.store import RecordKey
 from zenture.errors import ZentureMCPDependencyError, ZentureMCPError, ZentureMCPProtocolError
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
     from pathlib import Path
 
     from file_store import FileStore
 
 
-def _flow(store: FileStore, lock_dir: Path, opener: object) -> LoginFlow:
+def _flow(store: FileStore, lock_dir: Path, opener: Callable[[str], object]) -> LoginFlow:
     return LoginFlow(runtime_for(store, lock_dir, opener))
 
 

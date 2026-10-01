@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass
+from typing import cast
 
 import httpx
 
@@ -53,4 +54,5 @@ def request_json(
         return JsonResponse(status, None)
     if not isinstance(parsed, dict):
         return JsonResponse(status, None)
-    return JsonResponse(status, {str(key): value for key, value in parsed.items()})
+    body = cast("dict[object, object]", parsed)
+    return JsonResponse(status, {str(key): value for key, value in body.items()})

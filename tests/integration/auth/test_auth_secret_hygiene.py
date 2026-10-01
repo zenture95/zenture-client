@@ -29,14 +29,14 @@ def test_reprs_errors_logs_and_output_never_contain_secrets(
     caplog.set_level(logging.DEBUG, logger="zenture")
 
     session = LoginFlow(runtime_for(store, lock_dir, opener)).login(endpoint=env.endpoint)
-    core = session._core
+    core = session._core  # pyright: ignore[reportPrivateUsage]  # white-box test of internals
     identity = core.identity
     record = store.load(identity)
     assert record is not None
-    assert core._access is not None
+    assert core._access is not None  # pyright: ignore[reportPrivateUsage]  # white-box test of internals
     query = dict(urllib.parse.parse_qsl(urllib.parse.urlsplit(opened[0]).query))
     secrets_seen = {
-        core._access,
+        core._access,  # pyright: ignore[reportPrivateUsage]  # white-box test of internals
         record.refresh_token,
         query["state"],
         query["code_challenge"],

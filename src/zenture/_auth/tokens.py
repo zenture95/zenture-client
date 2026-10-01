@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import time
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 import httpx
 import jwt
@@ -43,7 +43,7 @@ class TokenSet:
 class KeyCache:
     """JWKS of one issuer; refetched at most once per unknown key id."""
 
-    keys: dict[str, Any] = field(default_factory=dict)
+    keys: dict[str, Any] = field(default_factory=dict[str, Any])
 
     def load(self, client: httpx.Client, discovery: Discovery) -> None:
         response = request_json(client, "GET", discovery.jwks_uri)
@@ -51,10 +51,12 @@ class KeyCache:
         if response.status != 200 or not isinstance(raw, list):
             raise TokenRejected
         loaded: dict[str, Any] = {}
-        for item in raw:
+        for entry in cast("list[object]", raw):
+            if not isinstance(entry, dict):
+                continue
+            item = cast("dict[object, Any]", entry)
             if (
-                isinstance(item, dict)
-                and item.get("kty") == "EC"
+                item.get("kty") == "EC"
                 and item.get("crv") == "P-256"
                 and isinstance(item.get("kid"), str)
                 and item.get("use", "sig") == "sig"

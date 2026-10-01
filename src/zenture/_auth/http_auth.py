@@ -16,7 +16,8 @@ if TYPE_CHECKING:
 
 
 def _core(session: AuthSession) -> SessionCore:
-    return session._core
+    # Internal auth adapter shares the session core without exposing credential access publicly.
+    return session._core  # pyright: ignore[reportPrivateUsage]
 
 
 class SessionAuth(httpx2.Auth):

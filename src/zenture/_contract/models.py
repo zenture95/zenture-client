@@ -723,11 +723,13 @@ class SafeResultCoverageItem(_RunResponseModel):
     @classmethod
     def _artifact_refs(cls, value: object) -> object:
         values = _coerce_tuple(value)
-        if isinstance(values, tuple) and any(
-            not isinstance(item, str) or _SAFE_ARTIFACT_REF_RE.fullmatch(item) is None
-            for item in values
-        ):
-            raise ValueError("artifact_refs must contain compiler-safe references")
+        if isinstance(values, tuple):
+            values = cast("tuple[object, ...]", values)
+            if any(
+                not isinstance(item, str) or _SAFE_ARTIFACT_REF_RE.fullmatch(item) is None
+                for item in values
+            ):
+                raise ValueError("artifact_refs must contain compiler-safe references")
         return values
 
     @model_validator(mode="after")

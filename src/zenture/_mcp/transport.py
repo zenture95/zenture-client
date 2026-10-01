@@ -133,7 +133,8 @@ async def open_streamable_http_transport(
     if session is not None:
         from zenture._auth.model import within_resource
 
-        if not within_resource(target.url, session._core.discovery.resource):
+        # Internal transport checks the session binding without adding a public credential seam.
+        if not within_resource(target.url, session._core.discovery.resource):  # pyright: ignore[reportPrivateUsage]
             raise ValueError("endpoint is outside the resource of this authorization session")
     token = await resolve_async_bearer_token(bearer_token) if bearer_token is not None else None
     try:

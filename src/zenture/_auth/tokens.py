@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import time
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 import httpx
 import jwt
@@ -15,6 +15,8 @@ from zenture._auth.http import JsonResponse, request_json
 from zenture._auth.model import CLIENT_ID, Binding
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
     from zenture._auth.discovery import Discovery
 
 _MAX_TOKEN_LENGTH = 4096
@@ -43,7 +45,7 @@ class TokenSet:
 class KeyCache:
     """JWKS of one issuer; refetched at most once per unknown key id."""
 
-    keys: dict[str, Any] = field(default_factory=dict)
+    keys: dict[str, Any] = field(default_factory=cast("Callable[[], dict[str, Any]]", dict))
 
     def load(self, client: httpx.Client, discovery: Discovery) -> None:
         response = request_json(client, "GET", discovery.jwks_uri)
@@ -51,17 +53,19 @@ class KeyCache:
         if response.status != 200 or not isinstance(raw, list):
             raise TokenRejected
         loaded: dict[str, Any] = {}
-        for item in raw:
-            if (
-                isinstance(item, dict)
-                and item.get("kty") == "EC"
-                and item.get("crv") == "P-256"
-                and isinstance(item.get("kid"), str)
-                and item.get("use", "sig") == "sig"
-            ):
-                loaded[item["kid"]] = ECAlgorithm.from_jwk(
-                    {key: value for key, value in item.items() if isinstance(key, str)}
-                )
+        for item in cast("list[object]", raw):
+            if isinstance(item, dict):
+                item = cast("dict[object, object]", item)
+                if (
+                    item.get("kty") == "EC"
+                    and item.get("crv") == "P-256"
+                    and isinstance(item.get("kid"), str)
+                    and item.get("use", "sig") == "sig"
+                ):
+                    # kid was checked above; all JWK members are still checked by the JWT parser.
+                    loaded[cast("str", item["kid"])] = ECAlgorithm.from_jwk(
+                        {key: value for key, value in item.items() if isinstance(key, str)}
+                    )
         self.keys = loaded
 
 

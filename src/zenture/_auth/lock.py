@@ -6,7 +6,7 @@ import contextlib
 import os
 import sys
 import time
-from collections.abc import Callable, Iterator
+from collections.abc import Callable, Generator
 from pathlib import Path
 
 from zenture._auth.errors import AuthUnavailable
@@ -81,7 +81,7 @@ def binding_lock(
 @contextlib.contextmanager
 def _held(
     identity: RecordKey, directory: Path, private_root: Path, wait_seconds: float
-) -> Iterator[None]:
+) -> Generator[None, None, None]:
     flags = os.O_RDWR | os.O_CREAT | getattr(os, "O_NOFOLLOW", 0)
     try:
         private_root.mkdir(mode=0o700, parents=True, exist_ok=True)

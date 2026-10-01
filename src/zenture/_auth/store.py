@@ -8,7 +8,7 @@ import json
 import sys
 import threading
 from dataclasses import dataclass, replace
-from typing import Any, Literal, Protocol
+from typing import Any, Literal, Protocol, cast
 
 from zenture._auth.errors import SecureStoreUnavailable
 from zenture._auth.model import Binding
@@ -98,8 +98,13 @@ class StoredRecord:
 
         try:
             data = json.loads(raw)
-            if not isinstance(data, dict) or data.get("v") != RECORD_VERSION:
+            if (
+                not isinstance(data, dict)
+                or cast("dict[str, object]", data).get("v") != RECORD_VERSION
+            ):
                 return None
+            # JSON object slots have string keys; values remain untrusted until the checks below.
+            data = cast("dict[str, object]", data)
             claimed = (data["issuer"], data["resource"], data["client_id"])
             if claimed != (identity.issuer, identity.resource, identity.client_id):
                 return None
@@ -118,7 +123,8 @@ class StoredRecord:
             return None
         if type(epoch) is not int or type(generation) is not int:
             return None
-        sub, connection_id, refresh_token, rotation_id = values
+        # The existing all-string check validates every slot of this fixed tuple.
+        sub, connection_id, refresh_token, rotation_id = cast("tuple[str, str, str, str]", values)
         return cls(
             identity=identity,
             binding=Binding(sub, connection_id, epoch, generation),

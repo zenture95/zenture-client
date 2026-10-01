@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import email
+import os
 import site
 import subprocess
 import sys
@@ -64,9 +65,12 @@ def test_built_wheel_declares_the_dependencies_and_imports_in_a_fresh_environmen
     location = tmp_path / "fresh"
     # Fresh interpreter environment; the locked local dependency runtime stands in for PyPI.
     venv.EnvBuilder(with_pip=True, system_site_packages=True).create(location)
-    packages = next((location / "lib").glob("python*/site-packages"))
+    packages = (
+        next(location.glob("lib/python*/site-packages"), None) or location / "Lib" / "site-packages"
+    )
     (packages / "dependency-runtime.pth").write_text("\n".join(site.getsitepackages()))
-    python = location / "bin" / "python"
+    bin_dir = location / ("Scripts" if os.name == "nt" else "bin")
+    python = bin_dir / ("python.exe" if os.name == "nt" else "python")
     subprocess.run(
         [
             str(python),

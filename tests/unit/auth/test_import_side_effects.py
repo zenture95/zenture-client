@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import subprocess
 import sys
 from typing import TYPE_CHECKING
@@ -41,6 +42,8 @@ def test_import_does_no_network_browser_keyring_or_lock_file_work(tmp_path: Path
     home = tmp_path / "home"
     home.mkdir()
     env = {"HOME": str(home), "USERPROFILE": str(home), "PATH": "/usr/bin:/bin"}
+    if os.name == "nt":
+        env["SystemRoot"] = os.environ["SYSTEMROOT"]
 
     result = subprocess.run(
         [sys.executable, "-I", "-c", PROBE],
@@ -80,6 +83,7 @@ sys.exit(zenture.cli.main(["--version"]))
             "USERPROFILE": str(home),
             "PATH": "",
             "PYTHONPATH": str(root / "src"),
+            **({"SystemRoot": os.environ["SYSTEMROOT"]} if os.name == "nt" else {}),
         },
         capture_output=True,
         text=True,

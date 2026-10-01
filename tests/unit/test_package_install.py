@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import site
 import subprocess
 import sys
@@ -66,13 +67,12 @@ def test_built_wheel_and_sdist_install_canonical_client(tmp_path: Path) -> None:
         # package installation itself is fresh and must resolve from this venv.
         venv.EnvBuilder(with_pip=True, system_site_packages=True).create(location)
         packages = (
-            location
-            / "lib"
-            / f"python{sys.version_info.major}.{sys.version_info.minor}"
-            / "site-packages"
+            next(location.glob("lib/python*/site-packages"), None)
+            or location / "Lib" / "site-packages"
         )
         (packages / "dependency-runtime.pth").write_text("\n".join(site.getsitepackages()))
-        python = location / "bin" / "python"
+        bin_dir = location / ("Scripts" if os.name == "nt" else "bin")
+        python = bin_dir / ("python.exe" if os.name == "nt" else "python")
         _run(
             [
                 str(python),

@@ -6,6 +6,7 @@ import asyncio
 import hashlib
 import io
 import json
+import math
 import time
 from functools import partial
 from types import SimpleNamespace
@@ -2613,6 +2614,22 @@ def test_sync_iter_events_passes_remaining_timeout_to_stream() -> None:
     client.close()
 
 
+def test_stream_deadline_subtraction_needs_only_clock_ulp_precision(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from zenture._resources.runs import remaining_stream_timeout
+
+    started = 32.0
+    timeout = 0.03
+    monkeypatch.setattr(time, "monotonic", lambda: started)
+    remaining = remaining_stream_timeout(run_id=RUN_ID, deadline=started + timeout)
+
+    assert remaining is not None
+    assert remaining > timeout  # Reproduces 0.030000000000001137 from binary arithmetic.
+    assert remaining <= timeout + math.ulp(started)
+    assert timeout + math.ulp(started) < 0.031  # A real 1ms overrun remains rejected.
+
+
 def test_sync_iter_events_bounds_idle_read_and_closes_stream() -> None:
     streams: list[_IdleSyncStream] = []
     read_timeouts: list[float] = []
@@ -2645,7 +2662,8 @@ def test_sync_iter_events_bounds_idle_read_and_closes_stream() -> None:
     elapsed = time.monotonic() - started
 
     assert read_timeouts
-    assert read_timeouts[0] <= 0.03
+    # Subtracting monotonic timestamps can round upward by an ulp of the clock.
+    assert read_timeouts[0] <= 0.03 + math.ulp(started)
     assert elapsed < 0.2
     assert streams[0].closed
     client.close()

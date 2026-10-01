@@ -15,6 +15,7 @@ import pytest
 
 from zenture._contract import (
     ArtifactUploadResponse,
+    AvailableCreditAmount,
     ListRunEventsResponse,
     ListRunsResponse,
     PublicRunResponse,
@@ -379,8 +380,9 @@ def test_mcp_start_preserves_terminal_billing_amount_validation() -> None:
 
     assert run.billing_projection is not None
     assert run.billing_projection.status == "settled"
-    assert run.billing_projection.final_credits is not None
-    assert run.billing_projection.final_credits.amount == "1.00"
+    final_credits = run.billing_projection.final_credits
+    assert isinstance(final_credits, AvailableCreditAmount)
+    assert final_credits.amount == "1.00"
 
 
 @pytest.mark.asyncio
@@ -1213,7 +1215,7 @@ async def test_official_transport_preserves_body_failures(
     import zenture._mcp.transport as transport_module
 
     class Context:
-        async def __aenter__(self) -> Context:
+        async def __aenter__(self) -> Any:
             return self
 
         async def __aexit__(self, *_exc_info: object) -> None:
@@ -1230,14 +1232,14 @@ async def test_official_transport_preserves_body_failures(
         if name == "mcp":
             return SimpleNamespace(ClientSession=Session)
         if name == "mcp.client.streamable_http":
+
             class StreamContext(Context):
                 async def __aenter__(self) -> tuple[object, object]:
                     return object(), object()
 
-            return SimpleNamespace(
-                streamable_http_client=lambda *_args, **_kwargs: StreamContext()
-            )
+            return SimpleNamespace(streamable_http_client=lambda *_args, **_kwargs: StreamContext())
         if name == "httpx2":
+
             class Timeout:
                 def __init__(self, *_args: object, **_kwargs: object) -> None:
                     pass
@@ -1268,7 +1270,7 @@ async def test_official_transport_does_not_fail_after_successful_body_on_close_e
         def __init__(self, *_args: object, **_kwargs: object) -> None:
             pass
 
-        async def __aenter__(self) -> Context:
+        async def __aenter__(self) -> Any:
             return self
 
         async def __aexit__(self, *_exc_info: object) -> None:
@@ -1289,10 +1291,9 @@ async def test_official_transport_does_not_fail_after_successful_body_on_close_e
         if name == "mcp":
             return SimpleNamespace(ClientSession=Session)
         if name == "mcp.client.streamable_http":
-            return SimpleNamespace(
-                streamable_http_client=lambda *_args, **_kwargs: FailingStream()
-            )
+            return SimpleNamespace(streamable_http_client=lambda *_args, **_kwargs: FailingStream())
         if name == "httpx2":
+
             class Timeout:
                 def __init__(self, *_args: object, **_kwargs: object) -> None:
                     pass

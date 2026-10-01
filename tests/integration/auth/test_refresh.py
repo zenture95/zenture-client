@@ -4,8 +4,6 @@ from __future__ import annotations
 
 import dataclasses
 import json
-import os
-import signal
 import socket
 import subprocess
 import sys
@@ -271,7 +269,7 @@ def test_killed_writer_after_send_leaves_a_journal_that_blocks_any_replay(
     writer = _spawn(env, ready, lock_dir)
     assert env.issuer.refresh_seen.wait(60)
 
-    os.kill(writer.pid, signal.SIGKILL)
+    writer.kill()  # SIGKILL on POSIX, TerminateProcess on Windows
     writer.wait(timeout=30)
     env.issuer.refresh_hold.set()
 

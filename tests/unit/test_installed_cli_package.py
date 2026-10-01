@@ -41,6 +41,8 @@ assert point.value == "zenture.cli:main"
 
 def _run(arguments: list[str], *, cwd: Path, home: Path) -> subprocess.CompletedProcess[str]:
     env = {"HOME": str(home), "USERPROFILE": str(home), "PATH": os.environ.get("PATH", "")}
+    # Windows needs these to initialise sockets; they carry no secrets.
+    env.update({key: os.environ[key] for key in ("SYSTEMROOT", "WINDIR") if key in os.environ})
     return subprocess.run(arguments, cwd=cwd, capture_output=True, text=True, check=False, env=env)
 
 

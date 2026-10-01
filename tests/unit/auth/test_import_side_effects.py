@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import subprocess
 import sys
 from typing import TYPE_CHECKING
@@ -39,6 +40,8 @@ def test_import_does_no_network_browser_keyring_or_lock_file_work(tmp_path: Path
     home = tmp_path / "home"
     home.mkdir()
     env = {"HOME": str(home), "USERPROFILE": str(home), "PATH": "/usr/bin:/bin"}
+    # Windows needs these to initialise sockets; they carry no secrets.
+    env.update({key: os.environ[key] for key in ("SYSTEMROOT", "WINDIR") if key in os.environ})
 
     result = subprocess.run(
         [sys.executable, "-I", "-c", PROBE],

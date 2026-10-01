@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import ast
 import importlib
+import os
 import re
 import subprocess
 import sys
@@ -36,6 +37,11 @@ def _read(path: Path) -> str:
     return path.read_text(encoding="utf-8")
 
 
+# Windows needs these to initialise sockets (asyncio import); they carry no secrets.
+def _windows_runtime() -> dict[str, str]:
+    return {key: os.environ[key] for key in ("SYSTEMROOT", "WINDIR") if key in os.environ}
+
+
 @cache
 def _help(*words: str) -> str:
     result = subprocess.run(
@@ -44,7 +50,7 @@ def _help(*words: str) -> str:
         capture_output=True,
         text=True,
         check=True,
-        env={"PYTHONPATH": str(ROOT / "src"), "PATH": ""},
+        env={"PYTHONPATH": str(ROOT / "src"), "PATH": "", **_windows_runtime()},
     )
     return result.stdout
 
@@ -180,7 +186,7 @@ def test_examples_import_quietly_and_print_help_without_network(path: Path) -> N
         capture_output=True,
         text=True,
         check=False,
-        env={"PYTHONPATH": str(ROOT / "src"), "PATH": ""},
+        env={"PYTHONPATH": str(ROOT / "src"), "PATH": "", **_windows_runtime()},
     )
     assert result.returncode == 0, result.stderr[-300:]
     assert "usage:" in result.stdout.lower()

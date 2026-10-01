@@ -644,10 +644,7 @@ with ZentureClient.from_env() as client:
         turn_id = chat.result.turn_id
         model_response_id = chat.result.model_response_id or chat.result.model_response_ids[0]
 
-        turn = next(
-            item for item in client.chat.messages(chat_id).turns
-            if item.turn_id == turn_id
-        )
+        turn = next(item for item in client.chat.messages(chat_id).turns if item.turn_id == turn_id)
 
         result = client.evaluations.run(
             user_message=turn.user_message,
@@ -716,16 +713,12 @@ Example response:
     "score": 86.0,
     "created_at": "2026-06-22T10:05:00Z",
     "amount_billed": {"amount": "2.00", "unit": "credits"},
-    "zenture_summary": {
-        "public_api": "The answer is relevant but relies on unavailable sources."
-    },
+    "zenture_summary": {"public_api": "The answer is relevant but relies on unavailable sources."},
     "zenture_suggestion": {
         "public_api": "Replace unavailable links with accessible primary sources."
     },
     "zenture_kpi_details": {
-        "public_api": {
-            "src_acces": {"value": 0, "analysis": "The cited URL returned 404."}
-        }
+        "public_api": {"src_acces": {"value": 0, "analysis": "The cited URL returned 404."}}
     },
     "results": [
         {

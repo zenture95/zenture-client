@@ -86,6 +86,7 @@ def test_public_run_response_coerces_wire_decision_to_strict_enum() -> None:
         {**_run(status="succeeded"), "acceptance_decision": "ready"}
     )
 
+    assert response.acceptance_decision is not None
     assert response.acceptance_decision.value == "ready"
 
 
@@ -107,7 +108,7 @@ def test_public_run_event_accepts_lifecycle_statuses(status: str) -> None:
 
 
 def test_public_run_event_rejects_unknown_status() -> None:
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="status"):
         PublicRunEvent.model_validate(
             {
                 "type": "run.event",
@@ -313,7 +314,7 @@ def test_sync_iter_events_stops_immediately_at_lifecycle_terminal(status: str) -
     )
     messages = list(client.runs.iter_events(RUN_ID, initial_interval=0.0, max_interval=0.0))
 
-    assert [message.status for message in messages] == [status]
+    assert [getattr(message, "status", None) for message in messages] == [status]
     assert len(requests) == 1
     client.close()
 
@@ -339,7 +340,10 @@ def test_sync_iter_events_keeps_cancel_requested_nonterminal() -> None:
     )
     messages = list(client.runs.iter_events(RUN_ID, initial_interval=0.0, max_interval=0.0))
 
-    assert [message.status for message in messages] == ["cancel_requested", "cancelled"]
+    assert [getattr(message, "status", None) for message in messages] == [
+        "cancel_requested",
+        "cancelled",
+    ]
     assert len(requests) == 2
     client.close()
 
@@ -849,7 +853,23 @@ def test_sync_iter_events_stops_on_caller_stop() -> None:
 
 
 @pytest.mark.asyncio
-async def test_async_iter_events_stops_on_caller_timeout() -> None:
+async def test_async_iter_events_stops_on_caller_timeout(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import zenture._resources.async_runs as async_runs_module
+    import zenture._resources.runs as runs_module
+
+    # A deterministic clock: coarse real clocks (Windows) may not advance within the 5 ms budget.
+    now = 1_000.0
+
+    async def sleep(seconds: float) -> None:
+        nonlocal now
+        now += seconds
+
+    fake_time = SimpleNamespace(monotonic=lambda: now, time=lambda: 1_000.0)
+    monkeypatch.setattr(async_runs_module, "time", fake_time)
+    monkeypatch.setattr(runs_module, "time", fake_time)
+    monkeypatch.setattr(asyncio, "sleep", sleep)
     requests: list[httpx.Request] = []
 
     async def handler(request: httpx.Request) -> httpx.Response:
@@ -1710,7 +1730,7 @@ async def test_async_wait_explicit_timeout_wins_over_a_server_deadline(
         "time",
         SimpleNamespace(monotonic=lambda: now, time=lambda: 1_000.0),
     )
-    monkeypatch.setattr(async_runs_module.asyncio, "sleep", sleep)
+    monkeypatch.setattr(asyncio, "sleep", sleep)
 
     async def handler(_request: httpx.Request) -> httpx.Response:
         nonlocal calls
@@ -1781,7 +1801,7 @@ async def test_async_wait_uses_the_first_non_null_deadline_once(
         "time",
         SimpleNamespace(monotonic=lambda: now, time=lambda: 1_000.0),
     )
-    monkeypatch.setattr(async_runs_module.asyncio, "sleep", sleep)
+    monkeypatch.setattr(asyncio, "sleep", sleep)
 
     def handler(_request: httpx.Request) -> httpx.Response:
         nonlocal calls
@@ -1819,7 +1839,7 @@ async def test_async_wait_past_deadline_cannot_extend_polling(
         "time",
         SimpleNamespace(monotonic=lambda: now, time=lambda: 1_000.0),
     )
-    monkeypatch.setattr(async_runs_module.asyncio, "sleep", sleep)
+    monkeypatch.setattr(asyncio, "sleep", sleep)
 
     async def handler(_request: httpx.Request) -> httpx.Response:
         nonlocal calls
@@ -2631,7 +2651,8 @@ def test_sync_iter_events_bounds_idle_read_and_closes_stream() -> None:
     elapsed = time.monotonic() - started
 
     assert read_timeouts
-    assert read_timeouts[0] <= 0.03
+    # Float tolerance only: deadline - monotonic() rounds by an ulp when the clock is coarse.
+    assert read_timeouts[0] <= 0.03 + 1e-9
     assert elapsed < 0.2
     assert streams[0].closed
     client.close()

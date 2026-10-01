@@ -9,7 +9,8 @@
 - Added native authorization for the hosted MCP endpoint: explicit browser
   (PKCE, loopback) and headless device login through `zenture.auth.login` /
   `login_async`, secure credential storage (macOS Keychain proven; Windows
-  Credential Manager and Linux Secret Service implemented, not yet verified)
+  Credential Manager and Linux Secret Service implemented with opt-in native
+  tests and an opt-in CI job per platform, not yet verified in CI)
   with a session-only mode, and safe refresh that requires a new login after an
   interrupted refresh.
 - Added the `zenture` command: `zenture auth login [--device] [--session-only]`,
@@ -19,6 +20,7 @@
   alias exists (hard cutover).
 - Declared CPython 3.14 support and configured the CI matrix for 3.11 to 3.14
   across Linux, macOS and Windows (configured, not yet run).
+- Pinned every GitHub Action in the workflows to a full commit SHA.
 
 All notable changes to `zenture-sdk` will be documented in this file.
 

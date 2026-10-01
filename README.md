@@ -108,8 +108,8 @@ zenture auth clear                 # delete the local record only
 | Platform | Credential store | Status |
 |---|---|---|
 | macOS | Keychain | proven |
-| Windows | Credential Manager | implemented, not yet verified |
-| Linux | Secret Service (for example GNOME Keyring) | implemented, not yet verified |
+| Windows | Credential Manager | opt-in native test written; not yet verified in CI |
+| Linux | Secret Service (for example GNOME Keyring) | opt-in native test written; not yet verified in CI |
 
 The six MCP tools are `run`, `attach_artifact`, `list_runs`, `get_run`,
 `cancel_run` and `record_run_outcome`, available on both peers.

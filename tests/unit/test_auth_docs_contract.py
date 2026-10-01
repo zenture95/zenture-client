@@ -210,9 +210,7 @@ def test_pyproject_supports_python_3_14_without_an_upper_cap() -> None:
         assert f"Programming Language :: Python :: 3.{minor}" in project["classifiers"]
 
 
-def test_development_workflow_tests_the_full_platform_matrix_and_native_keyring_is_macos_only_and_opt_in() -> (
-    None
-):
+def test_development_workflow_tests_the_full_platform_matrix_and_native_keyring_is_opt_in() -> None:
     text = _read(ROOT / ".github" / "workflows" / "development.yml")
     assert "\t" not in text
     testing = text.split("\n  testing:\n", 1)[1].split("\n  native-keyring:\n", 1)[0]
@@ -222,15 +220,31 @@ def test_development_workflow_tests_the_full_platform_matrix_and_native_keyring_
     assert "native_keyring" not in testing
     native = text.split("\n  native-keyring:\n", 1)[1].split("\n  governance:\n", 1)[0]
     assert "if: github.event_name == 'workflow_dispatch'" in native
-    assert "-m native_keyring" in native
     assert "continue-on-error: false" in native
-    # Only a macOS native-keychain test exists; no Windows/Linux native evidence is claimed.
-    assert "os: [" not in native
-    assert "matrix" not in native
-    assert "runs-on: macos-latest" in native
-    assert "ubuntu-latest" not in native
-    assert "windows-latest" not in native
-    assert "Windows and Linux native tests do not exist yet" in text
+    assert "fail-fast: false" in native
+    assert re.search(r"os: \[macos-latest, windows-latest, ubuntu-latest\]", native)
+    assert "runs-on: ${{ matrix.os }}" in native
+    assert native.count("-m native_keyring") == 2  # Linux inside the session bus, others plain
+    # Linux needs a session bus and an unlocked keyring with a CI-local test password.
+    assert "dbus-run-session" in native
+    assert "gnome-keyring-daemon --unlock" in native
+    assert "runner.os == 'Linux'" in native
+    assert "runner.os != 'Linux'" in native
+    assert "Windows and Linux native tests do not exist yet" not in text
+
+
+def test_every_workflow_action_is_pinned_to_a_full_commit_sha_with_a_tag_comment() -> None:
+    workflows = sorted((ROOT / ".github" / "workflows").glob("*.yml"))
+    assert workflows
+    uses = [
+        line.strip()
+        for path in workflows
+        for line in _read(path).splitlines()
+        if line.strip().startswith(("uses:", "- uses:"))
+    ]
+    assert uses
+    for line in uses:
+        assert re.fullmatch(r"-? ?uses: [\w./-]+@[0-9a-f]{40} # v\d+(\.\d+){0,2}", line), line
 
 
 def test_ci_and_python_support_wording_claims_nothing_that_was_not_run() -> None:

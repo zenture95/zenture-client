@@ -176,11 +176,9 @@ def test_backend_errors_surface_as_store_errors() -> None:
         store.load(KEY)
 
 
-@pytest.mark.native_keyring
-@pytest.mark.skipif(sys.platform != "darwin", reason="macOS Keychain proof only")
-def test_real_macos_keychain_roundtrip_with_the_explicit_backend() -> None:
+def _assert_native_roundtrip_and_cleanup(backend_module: str) -> None:
     backend = native_backend()
-    assert type(backend).__module__ == "keyring.backends.macOS"
+    assert type(backend).__module__ == backend_module
     identity = RecordKey(f"https://test-{uuid.uuid4().hex}.invalid", KEY.resource, KEY.client_id)
     store = KeyringStore(backend)
     record = StoredRecord(identity, BINDING, "rt_" + "b" * 43)
@@ -192,6 +190,24 @@ def test_real_macos_keychain_roundtrip_with_the_explicit_backend() -> None:
     finally:
         store.delete(identity)
     assert store.load(identity) is None
+
+
+@pytest.mark.native_keyring
+@pytest.mark.skipif(sys.platform != "darwin", reason="macOS Keychain proof only")
+def test_real_macos_keychain_roundtrip_with_the_explicit_backend() -> None:
+    _assert_native_roundtrip_and_cleanup("keyring.backends.macOS")
+
+
+@pytest.mark.native_keyring
+@pytest.mark.skipif(sys.platform != "win32", reason="Windows Credential Manager proof only")
+def test_real_windows_credential_manager_roundtrip_with_the_explicit_backend() -> None:
+    _assert_native_roundtrip_and_cleanup("keyring.backends.Windows")
+
+
+@pytest.mark.native_keyring
+@pytest.mark.skipif(sys.platform != "linux", reason="Linux Secret Service proof only")
+def test_real_linux_secret_service_roundtrip_with_the_explicit_backend() -> None:
+    _assert_native_roundtrip_and_cleanup("keyring.backends.SecretService")
 
 
 def test_protected_item_is_keyed_by_resource_and_client_only_and_issuer_is_verified_on_load() -> (

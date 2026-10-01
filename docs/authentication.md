@@ -107,8 +107,8 @@ refused instead of silently acting as the new one.
 | Platform | Store | Status |
 |---|---|---|
 | macOS | Keychain | proven |
-| Windows | Credential Manager | opt-in native test written; not yet verified in CI |
-| Linux | Secret Service | opt-in native test written; not yet verified in CI |
+| Windows | Credential Manager | verified in CI (opt-in native keyring job) |
+| Linux | Secret Service | verified in CI (opt-in native keyring job) |
 
 If no protected store is available you get `SecureStoreUnavailable`. Use
 `zenture auth login --session-only` (or `login(session_only=True)`) to keep the

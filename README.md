@@ -29,7 +29,7 @@ Candidate artifact checks do not establish public PyPI availability.
 - Import package: `zenture`
 - Sync client: `ZentureClient`
 - Async client: `AsyncZentureClient`
-- Supported Python: CPython 3.11, 3.12, 3.13, and 3.14 (Python 3.14 is declared; the CI matrix covers it but has not yet run; there is no upper version cap)
+- Supported Python: CPython 3.11, 3.12, 3.13, and 3.14 (Python 3.14 included: the CI matrix runs it on Linux, macOS and Windows; there is no upper version cap)
 - Command line: `zenture`
 
 ## Installation
@@ -108,8 +108,8 @@ zenture auth clear                 # delete the local record only
 | Platform | Credential store | Status |
 |---|---|---|
 | macOS | Keychain | proven |
-| Windows | Credential Manager | opt-in native test written; not yet verified in CI |
-| Linux | Secret Service (for example GNOME Keyring) | opt-in native test written; not yet verified in CI |
+| Windows | Credential Manager | verified in CI (opt-in native keyring job) |
+| Linux | Secret Service (for example GNOME Keyring) | verified in CI (opt-in native keyring job) |
 
 The six MCP tools are `run`, `attach_artifact`, `list_runs`, `get_run`,
 `cancel_run` and `record_run_outcome`, available on both peers.

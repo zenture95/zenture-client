@@ -492,7 +492,7 @@ def test_stray_request_with_unread_body_still_gets_its_response_and_the_callback
             timeout=20,
         )
 
-    server = threading.Thread(target=serve)
+    server = threading.Thread(target=serve, daemon=True)
     server.start()
 
     def exchange(request: bytes) -> bytes:
@@ -547,3 +547,35 @@ def test_draining_a_trickling_peer_is_bounded_in_total_time() -> None:
         peer.close()
         sender.join(timeout=2)
     assert elapsed < 1.0
+
+
+def test_reading_a_trickling_request_head_is_bounded_in_total_time() -> None:
+    # A local peer that never finishes its request head must not hold the
+    # single-threaded listener (which also blocks cancel and the login timeout).
+    from zenture._auth import browser
+
+    ours, peer = socket.socketpair()
+    stop = threading.Event()
+
+    def trickle() -> None:
+        with contextlib.suppress(OSError):
+            deadline = time.monotonic() + 4.0
+            peer.sendall(b"GET /oauth/callback HTTP/1.1\r\n")
+            while not stop.is_set() and time.monotonic() < deadline:
+                peer.sendall(b"X")
+                time.sleep(0.05)
+            peer.shutdown(socket.SHUT_WR)
+
+    sender = threading.Thread(target=trickle, daemon=True)
+    sender.start()
+    try:
+        started = time.monotonic()
+        result = browser._read_request(ours)  # pyright: ignore[reportPrivateUsage]  # white-box bound check
+        elapsed = time.monotonic() - started
+    finally:
+        stop.set()
+        ours.close()
+        peer.close()
+        sender.join(timeout=2)
+    assert result is None
+    assert elapsed < 3.0

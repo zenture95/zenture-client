@@ -107,7 +107,7 @@ def test_documented_behavior_matches_the_implemented_surface() -> None:
     for claim in (
         "pip install zenture",
         "Keychain",
-        "not yet verified",
+        "verified in CI",
         "one stored account",
         "zenture auth login --device",
         "zenture auth login --session-only",
@@ -256,10 +256,13 @@ def test_every_workflow_action_is_pinned_to_a_full_commit_sha_with_a_tag_comment
 def test_ci_and_python_support_wording_claims_nothing_that_was_not_run() -> None:
     readme = _read(ROOT / "README.md")
     changelog = _read(ROOT / "CHANGELOG.md")
-    assert "declared and tested in CI" not in readme
-    assert "Python 3.14 is declared; the CI matrix covers it but has not yet run" in readme
-    assert "run the CI matrix" not in changelog
-    assert "configured" in changelog
+    # The CI matrix (3.11-3.14 x Linux/macOS/Windows) and the native keyring jobs ran green;
+    # the docs say exactly that and no longer claim anything is pending.
+    assert "the CI matrix runs it on Linux, macOS and Windows" in readme
+    assert "has not yet run" not in readme
+    assert "not yet verified" not in readme
+    assert "not yet run" not in changelog
+    assert "not yet verified" not in changelog
 
 
 def test_authentication_guide_exit_codes_match_the_readme() -> None:

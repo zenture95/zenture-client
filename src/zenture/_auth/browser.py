@@ -28,6 +28,8 @@ CALLBACK_PATH = "/oauth/callback"
 LOGIN_TIMEOUT_SECONDS = 600.0
 _MAX_REQUEST_BYTES = 16 * 1024
 _CONNECTION_READ_SECONDS = 0.5
+# Total budget for one request head, so a trickling local peer cannot hold the listener.
+_REQUEST_READ_TOTAL_SECONDS = 2.0
 _SLICE_SECONDS = 0.2
 _DRAIN_SECONDS = 0.25
 _MAX_DRAIN_BYTES = 64 * 1024
@@ -103,10 +105,14 @@ def authorization_url(
 
 
 def _read_request(connection: socket.socket) -> tuple[str, str, dict[str, str]] | None:
-    connection.settimeout(_CONNECTION_READ_SECONDS)
+    deadline = time.monotonic() + _REQUEST_READ_TOTAL_SECONDS
     received = bytearray()
     try:
         while b"\r\n\r\n" not in received:
+            left = deadline - time.monotonic()
+            if left <= 0:
+                return None
+            connection.settimeout(min(_CONNECTION_READ_SECONDS, left))
             chunk = connection.recv(4096)
             if not chunk:
                 return None

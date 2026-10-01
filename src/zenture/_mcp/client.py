@@ -119,9 +119,9 @@ def _structured_content(result: object) -> object:
             if value is not None:
                 return value
         content = getattr(result, "content", None)
-    if not isinstance(content, (list, tuple)) or len(content) != 1:
+    if not isinstance(content, (list, tuple)) or len(cast("Sequence[object]", content)) != 1:
         return result_mapping if result_mapping is not None else None
-    block = content[0]
+    block = cast("Sequence[object]", content)[0]
     block_mapping = _mapping(block)
     block_type = (
         block_mapping.get("type") if block_mapping is not None else getattr(block, "type", None)
@@ -329,7 +329,8 @@ class McpClient:
             failure: BaseException | None = None
             with portal.wrap_async_context_manager(opened) as peer:
                 try:
-                    yield cls(_PortalTransport(portal, peer._transport))
+                    # Sync and async peers share the internal transport port on the portal thread.
+                    yield cls(_PortalTransport(portal, peer._transport))  # pyright: ignore[reportPrivateUsage]
                 except BaseException as exc:
                     # Close the loop side cleanly; the caller sees its own exception unwrapped.
                     failure = exc

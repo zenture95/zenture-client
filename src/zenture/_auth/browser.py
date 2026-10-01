@@ -144,14 +144,23 @@ def _drain_before_close(connection: socket.socket) -> None:
     """Half-close and discard unread request bytes so close never sends a reset.
 
     A reset can destroy the response the peer has not read yet (seen on Windows as
-    WinError 10054 for a stray request with a body). Bounded in bytes and time.
+    WinError 10054 for a stray request with a body). Bounded in bytes and in total time.
     """
 
     connection.shutdown(socket.SHUT_WR)
-    connection.settimeout(_DRAIN_SECONDS)
+    deadline = time.monotonic() + _DRAIN_SECONDS
     remaining = _MAX_DRAIN_BYTES
     while remaining > 0:
-        chunk = connection.recv(4096)
+        # A total deadline, not only a per-recv timeout: a trickling peer must not
+        # hold the single-threaded listener.
+        left = deadline - time.monotonic()
+        if left <= 0:
+            return
+        connection.settimeout(left)
+        try:
+            chunk = connection.recv(4096)
+        except TimeoutError:
+            return
         if not chunk:
             return
         remaining -= len(chunk)

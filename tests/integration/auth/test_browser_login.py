@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import base64
+import contextlib
 import hashlib
 import json
 import select
@@ -516,3 +517,33 @@ def test_stray_request_with_unread_body_still_gets_its_response_and_the_callback
     assert exchange(good).startswith(b"HTTP/1.1 200")
     server.join(timeout=20)
     assert outcome["result"].code == "real-code"
+
+
+def test_draining_a_trickling_peer_is_bounded_in_total_time() -> None:
+    # A local process that keeps trickling bytes must not hold the single-threaded
+    # listener: the drain stops after a fixed total time, not only per recv.
+    from zenture._auth import browser
+
+    ours, peer = socket.socketpair()
+    stop = threading.Event()
+
+    def trickle() -> None:
+        with contextlib.suppress(OSError):
+            deadline = time.monotonic() + 3.0
+            while not stop.is_set() and time.monotonic() < deadline:
+                peer.sendall(b"x")
+                time.sleep(0.05)
+            peer.shutdown(socket.SHUT_WR)
+
+    sender = threading.Thread(target=trickle, daemon=True)
+    sender.start()
+    try:
+        started = time.monotonic()
+        browser._drain_before_close(ours)  # pyright: ignore[reportPrivateUsage]  # white-box bound check
+        elapsed = time.monotonic() - started
+    finally:
+        stop.set()
+        ours.close()
+        peer.close()
+        sender.join(timeout=2)
+    assert elapsed < 1.0

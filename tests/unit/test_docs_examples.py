@@ -21,6 +21,7 @@ ROOT = Path(__file__).resolve().parents[2]
 DOC_FILES = [
     ROOT / "docs" / "authentication.md",
     ROOT / "docs" / "mcp-client.md",
+    ROOT / "docs" / "migration.md",
     ROOT / "docs" / "idempotency.md",
     ROOT / "docs" / "async-operations.md",
     ROOT / "docs" / "errors.md",
@@ -216,7 +217,12 @@ def test_readme_is_beta_ready_and_public_safe() -> None:
     required = [
         "pip install zenture",
         "Python 3.11",
-        "server-side only",
+        "server-side credentials",
+        "Do not put them in browsers, mobile apps, frontend",
+        "bundles, public notebooks, logs, analytics, traces, or customer-visible errors.",
+        "The server retains authorization, Run execution, billing, and",
+        "tenant authority",
+        "no local MCP server",
         "ZENTURE_API_KEY",
         "https://ai.zenture.app/profile?tab=api-tokens",
         "https://www.zenture.app/developers",

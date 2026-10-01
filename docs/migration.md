@@ -66,10 +66,13 @@ distribution, and reinstall the exact historical published version:
 .venv-zenture/bin/python -m pip install zenture-sdk==1.0.0rc3
 ```
 
-Restore the application imports and constructor names to the legacy form:
+Restore the application imports and constructor names to the legacy form.
+This inverse diff targets the historical published baseline, not the canonical
+client:
 
-```python
-from zenture import AsyncZenture, Zenture
+```diff
+-from zenture import AsyncZentureClient, ZentureClient
++from zenture import AsyncZenture, Zenture
 ```
 
 `zenture-sdk==1.0.0rc3` is a retained historical baseline. It is not overwritten,

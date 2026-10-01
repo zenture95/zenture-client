@@ -145,8 +145,11 @@ class AvailableCreditAmount(_RunResponseModel):
 class UnavailableCreditAmount(_RunResponseModel):
     status: Literal["unavailable"]
     reason_code: Literal[
-        "invalid_scale", "missing_scale", "unsupported_scale",
-        "legacy_unbound_scale", "billing_projection_unavailable",
+        "invalid_scale",
+        "missing_scale",
+        "unsupported_scale",
+        "legacy_unbound_scale",
+        "billing_projection_unavailable",
     ]
 
 
@@ -163,7 +166,9 @@ class PrepareCreditsProjectionV1(_RunResponseModel):
 
 
 class TerminalBillingProjectionV1(_RunResponseModel):
-    schema_version: Literal["run.terminal_billing_projection.v1"] = "run.terminal_billing_projection.v1"
+    schema_version: Literal["run.terminal_billing_projection.v1"] = (
+        "run.terminal_billing_projection.v1"
+    )
     status: Literal["pending", "settled", "released", "unavailable"]
     final_credits: CreditAmountProjectionV1 | None = None
 
@@ -577,8 +582,12 @@ class PrepareKnowledgeRunResponse(SDKBaseModel):
     planned_checks: tuple[str, ...] = Field(default_factory=tuple, max_length=64)
     unavailable_checks: tuple[str, ...] = Field(default_factory=tuple, max_length=64)
     expected_duration_seconds: int = Field(ge=1, le=86_400)
-    estimated_credits: CreditAmountProjectionV1 | str | None = Field(default=None, description="Deprecated legacy scalar; prefer billing_projection. ")
-    maximum_credits: CreditAmountProjectionV1 | str | None = Field(default=None, description="Deprecated legacy scalar; prefer billing_projection. ")
+    estimated_credits: CreditAmountProjectionV1 | str | None = Field(
+        default=None, description="Deprecated legacy scalar; prefer billing_projection. "
+    )
+    maximum_credits: CreditAmountProjectionV1 | str | None = Field(
+        default=None, description="Deprecated legacy scalar; prefer billing_projection. "
+    )
     billing_projection: PrepareCreditsProjectionV1 | None = None
     guest_slot_cost: int | None = Field(default=None, ge=0, le=1)
     start_admissible: bool
@@ -626,7 +635,12 @@ def _safe_result_text(value: object, *, maximum: int, field_name: str) -> str:
     normalized = " ".join(unicodedata.normalize("NFC", value).split())
     if not normalized or len(normalized) > maximum:
         raise ValueError(f"{field_name} bound invalid")
-    if _SAFE_RESULT_FORBIDDEN.search(normalized) or re.search(r"[\x00-\x1f\x7f\u202a-\u202e\u2066-\u2069]", normalized) or "<" in normalized or ">" in normalized:
+    if (
+        _SAFE_RESULT_FORBIDDEN.search(normalized)
+        or re.search(r"[\x00-\x1f\x7f\u202a-\u202e\u2066-\u2069]", normalized)
+        or "<" in normalized
+        or ">" in normalized
+    ):
         raise ValueError(f"{field_name} contains unsafe content")
     return normalized
 
@@ -647,7 +661,11 @@ class SafeResultFinding(_RunResponseModel):
     @field_validator("title", "summary", "explanation")
     @classmethod
     def _safe_text(cls, value: object, info: Any) -> str:
-        return _safe_result_text(value, maximum={"title": 256, "summary": 2000, "explanation": 4000}[info.field_name], field_name=info.field_name)
+        return _safe_result_text(
+            value,
+            maximum={"title": 256, "summary": 2000, "explanation": 4000}[info.field_name],
+            field_name=info.field_name,
+        )
 
 
 class SafeResultEvidenceSummary(_RunResponseModel):
@@ -661,7 +679,9 @@ class SafeResultEvidenceSummary(_RunResponseModel):
     def _safe_text(cls, value: object, info: Any) -> str | None:
         if value is None:
             return None
-        return _safe_result_text(value, maximum=1000 if info.field_name == "summary" else 256, field_name=info.field_name)
+        return _safe_result_text(
+            value, maximum=1000 if info.field_name == "summary" else 256, field_name=info.field_name
+        )
 
 
 class SafeResultLimitation(_RunResponseModel):
@@ -686,8 +706,14 @@ class SafeResultDecision(_RunResponseModel):
 
 
 class SafeResultCoverageItem(_RunResponseModel):
-    check_intent_ref: str | None = Field(default=None, max_length=256, pattern=r"^check-intent:[A-Za-z0-9_./:-]{1,243}$")
-    requirement_ref: str | None = Field(default=None, max_length=256, pattern=r"^(?:review-requirement|requirement):[A-Za-z0-9_./:-]{1,237}$")
+    check_intent_ref: str | None = Field(
+        default=None, max_length=256, pattern=r"^check-intent:[A-Za-z0-9_./:-]{1,243}$"
+    )
+    requirement_ref: str | None = Field(
+        default=None,
+        max_length=256,
+        pattern=r"^(?:review-requirement|requirement):[A-Za-z0-9_./:-]{1,237}$",
+    )
     status: Literal["performed", "skipped_optional", "unavailable", "failed", "degraded"]
     reason_code: str = Field(min_length=1, max_length=128, pattern=r"^[A-Za-z0-9_.-]{1,128}$")
     blocks_ready: bool
@@ -697,7 +723,10 @@ class SafeResultCoverageItem(_RunResponseModel):
     @classmethod
     def _artifact_refs(cls, value: object) -> object:
         values = _coerce_tuple(value)
-        if isinstance(values, tuple) and any(not isinstance(item, str) or _SAFE_ARTIFACT_REF_RE.fullmatch(item) is None for item in values):
+        if isinstance(values, tuple) and any(
+            not isinstance(item, str) or _SAFE_ARTIFACT_REF_RE.fullmatch(item) is None
+            for item in values
+        ):
             raise ValueError("artifact_refs must contain compiler-safe references")
         return values
 
@@ -722,7 +751,9 @@ class ComposedSafeResultContentV1(_RunResponseModel):
     schema_version: Literal["run.composed_safe_result_content.v1"]
     summary: str = Field(min_length=1, max_length=4000)
     findings: tuple[SafeResultFinding, ...] = Field(default_factory=tuple, max_length=64)
-    evidence_summaries: tuple[SafeResultEvidenceSummary, ...] = Field(default_factory=tuple, max_length=64)
+    evidence_summaries: tuple[SafeResultEvidenceSummary, ...] = Field(
+        default_factory=tuple, max_length=64
+    )
     limitations: tuple[SafeResultLimitation, ...] = Field(default_factory=tuple, max_length=64)
     decision: SafeResultDecision
     coverage: SafeResultCoverage
@@ -748,7 +779,12 @@ class SafeResultContentAvailableV1(_RunResponseModel):
 
 class SafeResultContentUnavailableV1(_RunResponseModel):
     status: Literal["unavailable"]
-    reason_code: Literal["legacy_result", "projection_incomplete", "result_content_unavailable", "result_content_expired"]
+    reason_code: Literal[
+        "legacy_result",
+        "projection_incomplete",
+        "result_content_unavailable",
+        "result_content_expired",
+    ]
 
 
 SafeResultContentProjectionV1 = Annotated[
@@ -790,8 +826,16 @@ class PublicRunResponse(_RunResponseModel):
     next_action: str | None = Field(default=None, max_length=128)
     run_insight_ref: str | None = Field(default=None, max_length=256)
     artifact_refs: tuple[str, ...] = Field(default_factory=tuple, max_length=16)
-    usage_summary: dict[str, int] = Field(default_factory=dict, max_length=8, description="Deprecated additive compatibility field; use billing_projection.")
-    billing_summary: dict[str, str] = Field(default_factory=dict, max_length=8, description="Deprecated additive compatibility field; use billing_projection.")
+    usage_summary: dict[str, int] = Field(
+        default_factory=dict,
+        max_length=8,
+        description="Deprecated additive compatibility field; use billing_projection.",
+    )
+    billing_summary: dict[str, str] = Field(
+        default_factory=dict,
+        max_length=8,
+        description="Deprecated additive compatibility field; use billing_projection.",
+    )
     billing_projection: TerminalBillingProjectionV1 | None = None
     limitations: tuple[str, ...] = Field(default_factory=tuple, max_length=32)
     safe_result_content: SafeResultContentProjectionV1 | None = None

@@ -93,7 +93,11 @@ def test_prepare_and_terminal_billing_projections_use_typed_credits() -> None:
             "proposal_version": 1,
             "expires_at": "2026-09-16T10:00:00Z",
             "inferred_work_type": "answer",
-            "task_contract_summary": {"work_type": "answer", "summary_ref": "summary:one", "requirement_count": 0},
+            "task_contract_summary": {
+                "work_type": "answer",
+                "summary_ref": "summary:one",
+                "requirement_count": 0,
+            },
             "expected_duration_seconds": 10,
             "estimated_credits": {"status": "available", "amount": "0.10", "unit": "credits"},
             "maximum_credits": {"status": "unavailable", "reason_code": "missing_scale"},

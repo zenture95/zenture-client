@@ -294,9 +294,7 @@ from zenture import ZentureClient
 
 with ZentureClient.from_env() as client:
     available_models = [
-        model.id
-        for model in client.models.list(mode="single").models
-        if model.is_available
+        model.id for model in client.models.list(mode="single").models if model.is_available
     ]
     if not available_models:
         raise RuntimeError("No available single-mode model for this token.")
@@ -320,9 +318,7 @@ from zenture import ZentureClient
 
 with ZentureClient.from_env() as client:
     available_models = [
-        model.id
-        for model in client.models.list(mode="multi").models
-        if model.is_available
+        model.id for model in client.models.list(mode="multi").models if model.is_available
     ]
     if len(available_models) < 2:
         raise RuntimeError("At least two available multi-mode models are required.")
@@ -420,10 +416,7 @@ from zenture.idempotency import idempotency_key
 with ZentureClient.from_env() as client:
     result = client.evaluations.run(
         user_message="What is zenture?",
-        ai_answer=(
-            "zenture evaluates AI outputs. "
-            "[Source](https://example.com/product-brief)"
-        ),
+        ai_answer=("zenture evaluates AI outputs. [Source](https://example.com/product-brief)"),
         external_id="support-ticket-123-answer-a",
         metadata={"source": "support_bot", "answer_format": "markdown_with_sources"},
         idempotency_key=idempotency_key("support-ticket-123-answer-a", "evaluate", "v1"),
@@ -465,10 +458,7 @@ with ZentureClient.from_env() as client:
         turn_id = chat.result.turn_id
         model_response_id = chat.result.model_response_id or chat.result.model_response_ids[0]
 
-        turn = next(
-            item for item in client.chat.messages(chat_id).turns
-            if item.turn_id == turn_id
-        )
+        turn = next(item for item in client.chat.messages(chat_id).turns if item.turn_id == turn_id)
 
         evaluation = client.evaluations.run(
             user_message=turn.user_message,

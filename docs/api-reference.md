@@ -158,15 +158,9 @@ with ZentureClient.from_env() as client:
     )
 
     turn_id = follow_up.result.turn_id
-    model_response_id = (
-        follow_up.result.model_response_id
-        or follow_up.result.model_response_ids[0]
-    )
+    model_response_id = follow_up.result.model_response_id or follow_up.result.model_response_ids[0]
 
-    turn = next(
-        item for item in client.chat.messages(chat_id).turns
-        if item.turn_id == turn_id
-    )
+    turn = next(item for item in client.chat.messages(chat_id).turns if item.turn_id == turn_id)
 
     evaluation = client.evaluations.run(
         user_message=turn.user_message,

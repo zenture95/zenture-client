@@ -62,13 +62,16 @@ def test_cli_version_exits_before_auth_without_side_effects(tmp_path: Path) -> N
     root = Path(__file__).resolve().parents[3]
     home = tmp_path / "home"
     home.mkdir()
-    probe = PROBE.replace('print("clean")', "") + """
+    probe = (
+        PROBE.replace('print("clean")', "")
+        + """
 zenture.cli.login_module.default_runtime = record("runtime")
 zenture.cli.LoginFlow = record("login")
 zenture.cli.check_status = record("status")
 zenture.cli.clear_stored = record("clear")
 sys.exit(zenture.cli.main(["--version"]))
 """
+    )
     result = subprocess.run(
         [sys.executable, "-c", probe],
         cwd=tmp_path,

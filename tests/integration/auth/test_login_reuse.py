@@ -11,6 +11,7 @@ from zenture._auth.errors import AuthUnavailable
 from zenture._auth.login import LoginFlow
 from zenture._auth.model import CLIENT_ID
 from zenture._auth.store import RecordKey
+from zenture.errors import ZentureMCPDependencyError, ZentureMCPError, ZentureMCPProtocolError
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -162,4 +163,58 @@ async def test_async_mcp_outage_at_the_probe_is_unavailable_not_a_crash(
         await flow.login_async(endpoint=env.endpoint)
 
     assert raised.value.code == "mcp_unavailable"
+    assert len(env.issuer.auth_requests) == 1
+
+
+class _ProbeFails(LoginFlow):
+    """The stored authorization is reusable, then the probe fails with a chosen error."""
+
+    def __init__(self, runtime: Any, error: Exception) -> None:
+        super().__init__(runtime)
+        self._error = error
+
+    async def probe(self, prepared: Any) -> None:
+        raise self._error
+
+
+_NON_OUTAGE_ERRORS = [ZentureMCPDependencyError(), ZentureMCPProtocolError("invalid_tool_catalog")]
+
+
+@pytest.mark.parametrize("error", _NON_OUTAGE_ERRORS, ids=["dependency", "protocol"])
+def test_dependency_and_protocol_errors_at_the_probe_propagate_and_keep_the_record(
+    env: Environment, file_store: FileStore, lock_dir: Path, error: ZentureMCPError
+) -> None:
+    _first_login(env, file_store, lock_dir)
+    key = RecordKey(env.issuer.issuer, env.mcp.resource, CLIENT_ID)
+    before = file_store.load(key)
+    opener, opened = browser_opener()
+    flow = _ProbeFails(runtime_for(file_store, lock_dir, opener), error)
+
+    with pytest.raises(ZentureMCPError) as raised:
+        flow.login(endpoint=env.endpoint)
+
+    assert raised.value is error
+    assert opened == []
+    assert len(env.issuer.auth_requests) == 1
+    after = file_store.load(key)
+    assert after is not None
+    assert before is not None
+    assert after.state == "ready"
+    assert after.binding == before.binding
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("error", _NON_OUTAGE_ERRORS, ids=["dependency", "protocol"])
+async def test_async_dependency_and_protocol_errors_at_the_probe_propagate(
+    env: Environment, file_store: FileStore, lock_dir: Path, error: ZentureMCPError
+) -> None:
+    _first_login(env, file_store, lock_dir)
+    opener, opened = browser_opener()
+    flow = _ProbeFails(runtime_for(file_store, lock_dir, opener), error)
+
+    with pytest.raises(ZentureMCPError) as raised:
+        await flow.login_async(endpoint=env.endpoint)
+
+    assert raised.value is error
+    assert opened == []
     assert len(env.issuer.auth_requests) == 1

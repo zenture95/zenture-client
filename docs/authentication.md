@@ -155,6 +155,6 @@ All are importable from `zenture.auth`.
 | `LoginCancelled` | Nothing was connected |
 
 Exit codes of `zenture auth ...`: `0` ok, `1` not logged in, `2` usage, `3`
-authorization required, `4` unavailable, `5` store unavailable, `6` cancelled,
-`7` permission denied, `130` interrupted. Never print, log or paste credentials;
+authorization required, `4` unavailable, `5` store unavailable, `6` cancelled or denied,
+`7` permission denied, `130` interrupted (Ctrl+C, also during a device login). Never print, log or paste credentials;
 the client itself never does.

@@ -21,6 +21,7 @@ from zenture._auth.errors import (
 )
 from zenture._auth.login import LoginFlow, Runtime
 from zenture._auth.stored import StatusReport, check_status, clear_stored
+from zenture.errors import ZentureMCPError
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -193,6 +194,13 @@ def _login(
     except AuthError as exc:
         print(_explain(exc), file=err)
         return _exit_code(exc)
+    except ZentureMCPError as exc:
+        print(
+            f"The MCP endpoint check failed ({exc.code}). This is not a temporary outage; "
+            "the stored authorization is unchanged and no new authorization was started.",
+            file=err,
+        )
+        return EXIT_UNAVAILABLE
     binding = session.binding
     session.close()
     if args.session_only:

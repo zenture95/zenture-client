@@ -29,7 +29,7 @@ Candidate artifact checks do not establish public PyPI availability.
 - Import package: `zenture`
 - Sync client: `ZentureClient`
 - Async client: `AsyncZentureClient`
-- Supported Python: CPython 3.11, 3.12, 3.13, and 3.14 (Python 3.14 is declared; the CI matrix includes 3.14 (not yet run); there is no upper version cap)
+- Supported Python: CPython 3.11, 3.12, 3.13, and 3.14 (Python 3.14 is declared; the CI matrix covers it but has not yet run; there is no upper version cap)
 - Command line: `zenture`
 
 ## Installation

@@ -14,7 +14,7 @@ from zenture._auth.errors import (
     SecureStoreUnavailable,
 )
 from zenture._auth.lock import binding_lock
-from zenture._auth.login import LoginFlow, Prepared, Runtime
+from zenture._auth.login import LoginFlow, Prepared, Runtime, is_mcp_outage
 from zenture._auth.model import CLIENT_ID, Target
 from zenture._auth.store import RecordKey, StoredRecord, StoreError
 from zenture.errors import ZentureMCPError
@@ -109,6 +109,6 @@ def check_status(endpoint: str | None, runtime: Runtime | None = None) -> Status
         return report("authorization_required", exc.code)
     except AuthUnavailable as exc:
         return report("unavailable", exc.code)
-    except ZentureMCPError:
-        return report("unavailable", "mcp_unavailable")
+    except ZentureMCPError as exc:
+        return report("unavailable", "mcp_unavailable" if is_mcp_outage(exc) else exc.code)
     return report("connected", binding=prepared.core.binding)

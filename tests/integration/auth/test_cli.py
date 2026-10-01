@@ -15,6 +15,7 @@ from zenture._auth.login import LoginFlow
 from zenture._auth.model import CLIENT_ID
 from zenture._auth.store import RecordKey, StoreError
 from zenture.cli import main
+from zenture.errors import ZentureMCPDependencyError, ZentureMCPError, ZentureMCPProtocolError
 
 if TYPE_CHECKING:
     from file_store import FileStore
@@ -279,6 +280,65 @@ def test_login_with_a_stored_record_and_an_mcp_outage_exits_unavailable(
     assert "Traceback" not in result.text
     assert opened == []
     assert len(env.issuer.auth_requests) == 1
+    assert _stored(file_store, env) is not None
+
+
+class _ProbeFails(LoginFlow):
+    def __init__(self, runtime: Any, error: Exception) -> None:
+        super().__init__(runtime)
+        self._error = error
+
+    async def probe(self, prepared: Any) -> None:
+        raise self._error
+
+
+_NON_OUTAGE_ERRORS = [ZentureMCPDependencyError(), ZentureMCPProtocolError("invalid_tool_catalog")]
+
+
+@pytest.mark.parametrize("error", _NON_OUTAGE_ERRORS, ids=["dependency", "protocol"])
+def test_login_probe_dependency_or_protocol_error_is_not_reported_as_try_later(
+    env: Environment,
+    file_store: FileStore,
+    lock_dir: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    error: ZentureMCPError,
+) -> None:
+    run(["auth", "login"], _runtime(file_store, lock_dir), env)
+    monkeypatch.setattr("zenture.cli.LoginFlow", lambda runtime: _ProbeFails(runtime, error))
+    opener, opened = browser_opener()
+
+    result = run(["auth", "login"], _runtime(file_store, lock_dir, opener), env)
+
+    assert result.code == 4
+    assert "later" not in result.err
+    assert error.code in result.err
+    assert "Traceback" not in result.text
+    assert opened == []
+    assert len(env.issuer.auth_requests) == 1
+    assert _stored(file_store, env) is not None
+
+
+@pytest.mark.parametrize("error", _NON_OUTAGE_ERRORS, ids=["dependency", "protocol"])
+def test_status_probe_dependency_or_protocol_error_reports_its_own_reason(
+    env: Environment,
+    file_store: FileStore,
+    lock_dir: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    error: ZentureMCPError,
+) -> None:
+    run(["auth", "login"], _runtime(file_store, lock_dir), env)
+
+    async def failing(_self: Any, _prepared: Any) -> None:
+        raise error
+
+    monkeypatch.setattr(LoginFlow, "probe", failing)
+
+    result = run(["auth", "status"], _runtime(file_store, lock_dir), env)
+
+    assert result.code == 4
+    assert f"reason: {error.code}" in result.out
+    assert "mcp_unavailable" not in result.text
+    assert "Traceback" not in result.text
     assert _stored(file_store, env) is not None
 
 

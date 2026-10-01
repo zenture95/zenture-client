@@ -94,6 +94,15 @@ class Prepared:
         )
 
 
+MCP_TRANSPORT_UNAVAILABLE = "mcp_transport_unavailable"
+
+
+def is_mcp_outage(exc: ZentureMCPError) -> bool:
+    """Only a transport outage is transient; dependency and protocol errors are not."""
+
+    return exc.code == MCP_TRANSPORT_UNAVAILABLE
+
+
 def _mcp_unavailable() -> AuthUnavailable:
     """The stored authorization stays; an MCP outage never justifies a new authorization."""
 
@@ -121,6 +130,8 @@ class LoginFlow:
             except AuthorizationRequired:
                 pass
             except ZentureMCPError as exc:
+                if not is_mcp_outage(exc):
+                    raise
                 raise _mcp_unavailable() from exc
             else:
                 return AuthSession(prepared.core)
@@ -139,6 +150,8 @@ class LoginFlow:
             except AuthorizationRequired:
                 pass
             except ZentureMCPError as exc:
+                if not is_mcp_outage(exc):
+                    raise
                 raise _mcp_unavailable() from exc
             else:
                 return AuthSession(prepared.core)

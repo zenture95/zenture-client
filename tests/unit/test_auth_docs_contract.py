@@ -210,7 +210,9 @@ def test_pyproject_supports_python_3_14_without_an_upper_cap() -> None:
         assert f"Programming Language :: Python :: 3.{minor}" in project["classifiers"]
 
 
-def test_development_workflow_tests_the_full_platform_matrix_and_opt_in_native_keyring() -> None:
+def test_development_workflow_tests_the_full_platform_matrix_and_native_keyring_is_macos_only_and_opt_in() -> (
+    None
+):
     text = _read(ROOT / ".github" / "workflows" / "development.yml")
     assert "\t" not in text
     testing = text.split("\n  testing:\n", 1)[1].split("\n  native-keyring:\n", 1)[0]
@@ -235,9 +237,20 @@ def test_ci_and_python_support_wording_claims_nothing_that_was_not_run() -> None
     readme = _read(ROOT / "README.md")
     changelog = _read(ROOT / "CHANGELOG.md")
     assert "declared and tested in CI" not in readme
-    assert "CI matrix includes 3.14 (not yet run)" in readme
+    assert "Python 3.14 is declared; the CI matrix covers it but has not yet run" in readme
     assert "run the CI matrix" not in changelog
     assert "configured" in changelog
+
+
+def test_authentication_guide_exit_codes_match_the_readme() -> None:
+    guide = _read(ROOT / "docs" / "authentication.md")
+    readme = _read(ROOT / "README.md")
+    for line in (
+        "`6` cancelled or denied, `7` permission denied",
+        "`130` interrupted (Ctrl+C, also during a device login)",
+    ):
+        assert line.replace("\n", " ") in " ".join(guide.split())
+    assert "| `6` | login cancelled (denied or declined) |" in readme
 
 
 def test_refresh_safety_docs_describe_mark_then_delete_on_the_next_attempt() -> None:

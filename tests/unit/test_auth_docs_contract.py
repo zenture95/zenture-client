@@ -119,7 +119,21 @@ def test_documented_behavior_matches_the_implemented_surface() -> None:
         assert claim in flows, claim
     mcp = _read(ROOT / "docs" / "mcp-client.md")
     assert "idempotency_key" in mcp
-    assert re.search(r"idempotency_key.{0,200}not available", mcp, re.DOTALL)
+    recovery = " ".join(mcp.split("## Run idempotency", 1)[1].split())
+    for claim in (
+        "save an explicit key in your application **before** calling `run`",
+        "reuse it verbatim with the same task, artifact and profile",
+        "Null, non-string values and whitespace are rejected before send",
+        "`ZentureMCPError.idempotency_key` retains the locally attempted key",
+        "A missing or foreign receipt raises `ZentureMCPProtocolError` with the local key",
+        "There is no automatic timeout/server-error retry or stored last-operation key",
+        "Cancellation still propagates",
+        "it does not prove acceptance, completion or a debit",
+        "Reuse never bypasses current authorization or admission",
+        "an expired prepared-only Run is not made admissible",
+        "Never use a replacement key as a fallback after an uncertain outcome",
+    ):
+        assert claim in recovery, claim
     assert "OAuth implementation" not in mcp
     assert "zenture._mcp" not in mcp
     assert (

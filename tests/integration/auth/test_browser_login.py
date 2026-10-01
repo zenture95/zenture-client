@@ -474,3 +474,45 @@ def test_the_callback_port_is_bound_exclusively_on_windows_only(
     else:
         assert calls[0][0] == "bind"
         assert [call for call in calls if call[0] == "setsockopt"] == []
+
+
+def test_stray_request_with_unread_body_still_gets_its_response_and_the_callback_survives() -> None:
+    listener, redirect = bind_loopback()
+    parts = urllib.parse.urlsplit(redirect)
+    outcome: dict[str, Any] = {}
+
+    def serve() -> None:
+        outcome["result"] = wait_for_callback(
+            listener,
+            redirect_uri=redirect,
+            state="state-1",
+            verifier="verifier-1",
+            issuer="https://issuer.example",
+            timeout=20,
+        )
+
+    server = threading.Thread(target=serve)
+    server.start()
+
+    def exchange(request: bytes) -> bytes:
+        with socket.create_connection((parts.hostname or "", parts.port or 0), timeout=10) as peer:
+            peer.sendall(request)
+            received = bytearray()
+            while chunk := peer.recv(4096):
+                received.extend(chunk)
+            return bytes(received)
+
+    body = b"x" * 12_000  # larger than one listener read: bytes stay unread at close
+    stray = (
+        f"POST {parts.path} HTTP/1.1\r\nHost: {parts.netloc}\r\nContent-Length: {len(body)}\r\n\r\n"
+    ).encode("ascii") + body
+    # A reset on close would discard this response (Windows: WinError 10054).
+    assert exchange(stray).startswith(b"HTTP/1.1 400")
+
+    good = (
+        f"GET {parts.path}?state=state-1&code=real-code&iss=https%3A%2F%2Fissuer.example "
+        f"HTTP/1.1\r\nHost: {parts.netloc}\r\n\r\n"
+    ).encode("ascii")
+    assert exchange(good).startswith(b"HTTP/1.1 200")
+    server.join(timeout=20)
+    assert outcome["result"].code == "real-code"

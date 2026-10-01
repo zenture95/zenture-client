@@ -29,6 +29,8 @@ LOGIN_TIMEOUT_SECONDS = 600.0
 _MAX_REQUEST_BYTES = 16 * 1024
 _CONNECTION_READ_SECONDS = 0.5
 _SLICE_SECONDS = 0.2
+_DRAIN_SECONDS = 0.25
+_MAX_DRAIN_BYTES = 64 * 1024
 _PAGE = (
     b"<!doctype html><html lang=en><meta charset=utf-8><title>zenture</title>"
     b"<body><p>%s</p></body></html>"
@@ -135,6 +137,24 @@ def _respond(connection: socket.socket, status: str, message: str) -> None:
     ).encode("ascii")
     with contextlib.suppress(OSError):
         connection.sendall(head + body)
+        _drain_before_close(connection)
+
+
+def _drain_before_close(connection: socket.socket) -> None:
+    """Half-close and discard unread request bytes so close never sends a reset.
+
+    A reset can destroy the response the peer has not read yet (seen on Windows as
+    WinError 10054 for a stray request with a body). Bounded in bytes and time.
+    """
+
+    connection.shutdown(socket.SHUT_WR)
+    connection.settimeout(_DRAIN_SECONDS)
+    remaining = _MAX_DRAIN_BYTES
+    while remaining > 0:
+        chunk = connection.recv(4096)
+        if not chunk:
+            return
+        remaining -= len(chunk)
 
 
 def _single(query: dict[str, list[str]], key: str) -> str | None:

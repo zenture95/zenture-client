@@ -51,6 +51,9 @@ python -m pip install .
 The installation includes the `zenture` command and the `zenture.auth` and
 `zenture.mcp` modules; no extra is needed.
 
+Run `zenture --version` to print the installed package version and exit without
+logging in or accessing the credential store or network.
+
 ## Authentication
 
 Create API tokens in the existing zenture webapp with an existing account:

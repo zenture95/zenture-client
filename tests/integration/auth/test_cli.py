@@ -429,7 +429,7 @@ def test_help_documents_the_commands_flags_and_exit_codes(
         assert expected in text
 
 
-@pytest.mark.parametrize("argv", [["run"], ["server"], ["auth", "revoke"], []])
+@pytest.mark.parametrize("argv", [["run"], ["server"], ["auth", "revoke"], [], ["--unknown"]])
 def test_no_run_server_or_revoke_commands_exist(argv: list[str]) -> None:
     with pytest.raises(SystemExit) as exited:
         main(argv)

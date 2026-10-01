@@ -21,6 +21,7 @@ from zenture._auth.errors import (
 )
 from zenture._auth.login import LoginFlow, Runtime
 from zenture._auth.stored import StatusReport, check_status, clear_stored
+from zenture._version import __version__
 from zenture.errors import ZentureMCPError
 
 if TYPE_CHECKING:
@@ -96,6 +97,7 @@ def _build_parser() -> argparse.ArgumentParser:
         epilog=_EXIT_CODES,
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
+    parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
     groups = parser.add_subparsers(dest="group", required=True, metavar="auth")
     auth = groups.add_parser(
         "auth",

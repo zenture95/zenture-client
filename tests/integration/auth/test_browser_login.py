@@ -423,3 +423,54 @@ def test_stalled_local_connection_does_not_delay_the_real_callback() -> None:
 
     assert result.code == "c"
     assert elapsed < 1.5
+
+
+class _RecordingSocket:
+    """Socket double that records the order of option and bind calls."""
+
+    calls: list[tuple[Any, ...]] = []  # noqa: RUF012
+
+    def __init__(self, family: int, kind: int) -> None:
+        pass
+
+    def setsockopt(self, level: int, option: int, value: int) -> None:
+        self.calls.append(("setsockopt", level, option, value))
+
+    def bind(self, address: tuple[str, int]) -> None:
+        self.calls.append(("bind", address))
+
+    def listen(self, backlog: int) -> None:
+        pass
+
+    def getsockname(self) -> tuple[str, int]:
+        return ("127.0.0.1", 4242)
+
+    def close(self) -> None:
+        pass
+
+
+@pytest.mark.parametrize(
+    ("platform", "exclusive"), [("win32", True), ("linux", False), ("darwin", False)]
+)
+def test_the_callback_port_is_bound_exclusively_on_windows_only(
+    monkeypatch: pytest.MonkeyPatch, platform: str, exclusive: bool
+) -> None:
+    from types import SimpleNamespace
+
+    from zenture._auth import browser
+
+    _RecordingSocket.calls = []
+    monkeypatch.setattr(browser, "sys", SimpleNamespace(platform=platform))
+    monkeypatch.setattr(socket, "SO_EXCLUSIVEADDRUSE", 0x7FFFFFFC, raising=False)
+    monkeypatch.setattr(socket, "socket", _RecordingSocket)
+
+    bind_loopback()
+
+    calls = _RecordingSocket.calls
+    bind_index = next(i for i, call in enumerate(calls) if call[0] == "bind")
+    options = [call for call in calls[:bind_index] if call[0] == "setsockopt"]
+    if exclusive:
+        assert options == [("setsockopt", socket.SOL_SOCKET, 0x7FFFFFFC, 1)]
+    else:
+        assert calls[0][0] == "bind"
+        assert [call for call in calls if call[0] == "setsockopt"] == []

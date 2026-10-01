@@ -200,6 +200,35 @@ def test_a_verification_uri_with_control_characters_is_never_shown(
     assert env.issuer.device_polls == []
 
 
+@pytest.mark.parametrize(
+    "uri",
+    ["https://evil.test/device", "https://issuer.test:8443/device", "http://127.0.0.1:1/device"],
+)
+def test_a_verification_uri_of_another_origin_than_the_issuer_is_never_shown(
+    env: Environment, store: RecordStore, lock_dir: Path, uri: str
+) -> None:
+    env.issuer.device_verification_uri = uri
+    shown = Shown()
+
+    with pytest.raises(AuthUnavailable) as raised:
+        _device_login(env, store, lock_dir, FakeClock(), shown)
+
+    assert raised.value.code == "device_authorization_invalid"
+    assert shown.prompts == []
+    assert env.issuer.device_polls == []
+
+
+def test_a_verification_uri_of_the_issuer_origin_is_shown(
+    env: Environment, store: RecordStore, lock_dir: Path
+) -> None:
+    env.issuer.device_script = ["approve"]
+    shown = Shown()
+
+    _device_login(env, store, lock_dir, FakeClock(), shown)
+
+    assert shown.prompts[0][0] == f"{env.issuer.issuer}/device"
+
+
 def test_cancel_stops_a_long_poll_interval_within_one_second(
     env: Environment, lock_dir: Path
 ) -> None:

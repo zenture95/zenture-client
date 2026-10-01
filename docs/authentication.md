@@ -73,7 +73,7 @@ The client opens your system browser and asks you to approve access in zenture.
 It uses the OAuth authorization code flow with PKCE: the browser returns to a
 loopback address that exists only on your machine for the duration of the login
 (the listener binds before the browser opens, accepts one callback and is closed
-afterwards). The sign-in must finish within 10 minutes. If no browser can be
+afterwards; on Windows the port is claimed exclusively so no other local process can share it). The sign-in must finish within 10 minutes. If no browser can be
 opened or no loopback address is available, the command stops and suggests
 `--device`; it never switches flows on its own.
 
@@ -83,7 +83,7 @@ opened or no loopback address is available, the command stops and suggests
 zenture auth login --device
 ```
 
-The terminal shows a verification address and a one-time code. Enter the code on
+The terminal shows a verification address and a one-time code; the client only shows an address on the issuer's own origin. Enter the code on
 any other device where you are signed in to zenture. The client waits at most
 10 minutes for your approval. Press Ctrl+C to stop: the pending request simply
 expires on the server and nothing is connected. If the code expires, or the

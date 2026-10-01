@@ -13,7 +13,7 @@ import httpx
 
 from zenture._auth.errors import AuthorizationRequired, AuthUnavailable, LoginCancelled
 from zenture._auth.http import PRE_SEND_ERRORS, JsonResponse, request_json
-from zenture._auth.model import CLIENT_ID, SCOPE, is_secure_origin
+from zenture._auth.model import CLIENT_ID, SCOPE, is_secure_origin, origin
 from zenture._auth.tokens import KeyCache, TokenRejected, TokenSet, parse_token_response
 
 if TYPE_CHECKING:
@@ -112,6 +112,7 @@ def _start(client: httpx.Client, discovery: Discovery) -> _Authorization:
         and len(verification_uri) <= _MAX_FIELD
         and _is_plain_text(verification_uri)
         and is_secure_origin(verification_uri)
+        and origin(verification_uri) == origin(discovery.issuer)
         and expires_in is not None
         and interval is not None
     ):

@@ -9,6 +9,7 @@ import hmac
 import secrets
 import select
 import socket
+import sys
 import time
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -62,6 +63,9 @@ def bind_loopback() -> tuple[socket.socket, str]:
             last_error = exc
             continue
         try:
+            if sys.platform == "win32":
+                # Windows lets a second local process share a port unless it is claimed exclusively.
+                listener.setsockopt(socket.SOL_SOCKET, socket.SO_EXCLUSIVEADDRUSE, 1)
             listener.bind((host, 0))
             listener.listen(4)
         except OSError as exc:

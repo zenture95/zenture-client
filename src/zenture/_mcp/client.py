@@ -8,6 +8,7 @@ import re
 from collections.abc import AsyncGenerator, Generator, Iterable, Mapping, Sequence
 from contextlib import asynccontextmanager, contextmanager
 from typing import TYPE_CHECKING, Any, Literal, TypeVar, cast
+from uuid import uuid4
 
 from pydantic import BaseModel, ValidationError
 
@@ -29,6 +30,8 @@ from zenture._mcp.contracts import (
     McpListRunsRequest,
     McpOutcomeRequest,
     McpRunRead,
+    McpRunResponse,
+    validate_run_idempotency_key,
 )
 from zenture._mcp.transport import (
     AsyncBearerTokenProvider,
@@ -40,6 +43,8 @@ from zenture.errors import ZentureMCPError, ZentureMCPProtocolError
 
 if TYPE_CHECKING:
     from zenture._auth.session import AuthSession
+
+_OMITTED_RUN_KEY = object()
 
 _MAX_ARGUMENT_BYTES = 256 * 1024
 _MAX_RESULT_BYTES = 256 * 1024
@@ -176,9 +181,11 @@ def _error_from_payload(payload: Mapping[str, object]) -> ZentureMCPError:
     )
 
 
-def _decode_tool_result(result: object) -> dict[str, object]:
+def _decode_tool_result(result: object, *, expected_key: str | None = None) -> dict[str, object]:
     structured = _structured_content(result)
     payload = _validate_safe_payload(structured)
+    if expected_key is not None and payload.get("idempotency_key") != expected_key:
+        raise ZentureMCPProtocolError("idempotency_key_mismatch")
     if _is_error_result(result) or "error" in payload:
         raise _error_from_payload(payload)
     return payload
@@ -368,15 +375,29 @@ class McpClient:
                 retryable=True,
                 next_action="retry_later",
             ) from exc
-        return _decode_tool_result(result)
+        return _decode_tool_result(
+            result,
+            expected_key=cast("str", validated["idempotency_key"]) if name == "run" else None,
+        )
 
     def run(
-        self, *, task: str, artifact: dict[str, Any], profile: str = "standard"
-    ) -> PublicRunResponse:
-        return _parse_model(
-            PublicRunResponse,
-            self._call("run", _run_request(task=task, artifact=artifact, profile=profile)),
+        self,
+        *,
+        task: str,
+        artifact: dict[str, Any],
+        profile: str = "standard",
+        idempotency_key: str = cast("str", _OMITTED_RUN_KEY),
+    ) -> McpRunResponse:
+        key = validate_run_idempotency_key(
+            uuid4().hex if idempotency_key is _OMITTED_RUN_KEY else idempotency_key
         )
+        arguments = _run_request(task=task, artifact=artifact, profile=profile)
+        arguments["idempotency_key"] = key
+        try:
+            return _parse_model(McpRunResponse, self._call("run", arguments))
+        except ZentureMCPError as exc:
+            exc.idempotency_key = key
+            raise
 
     def attach_artifact(
         self, *, file_name: str, mime_type: str, byte_size: int, content_hash: str
@@ -570,15 +591,29 @@ class AsyncMcpClient:
                 retryable=True,
                 next_action="retry_later",
             ) from exc
-        return _decode_tool_result(result)
+        return _decode_tool_result(
+            result,
+            expected_key=cast("str", validated["idempotency_key"]) if name == "run" else None,
+        )
 
     async def run(
-        self, *, task: str, artifact: dict[str, Any], profile: str = "standard"
-    ) -> PublicRunResponse:
-        return _parse_model(
-            PublicRunResponse,
-            await self._call("run", _run_request(task=task, artifact=artifact, profile=profile)),
+        self,
+        *,
+        task: str,
+        artifact: dict[str, Any],
+        profile: str = "standard",
+        idempotency_key: str = cast("str", _OMITTED_RUN_KEY),
+    ) -> McpRunResponse:
+        key = validate_run_idempotency_key(
+            uuid4().hex if idempotency_key is _OMITTED_RUN_KEY else idempotency_key
         )
+        arguments = _run_request(task=task, artifact=artifact, profile=profile)
+        arguments["idempotency_key"] = key
+        try:
+            return _parse_model(McpRunResponse, await self._call("run", arguments))
+        except ZentureMCPError as exc:
+            exc.idempotency_key = key
+            raise
 
     async def attach_artifact(
         self, *, file_name: str, mime_type: str, byte_size: int, content_hash: str

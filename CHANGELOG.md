@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- MCP Run peers now allocate or accept a strict caller-owned idempotency key and
+  expose validated Run-only success/error receipts for deliberate recovery.
+  Save an explicit key before interruption; default model serialization and
+  REST models retain their existing shape.
+
 - Rename the repository to `zenture-client`, the distribution to `zenture`, and
   public API classes to `ZentureClient` / `AsyncZentureClient` without aliases.
 - Preserve API-token resource behavior and caller-provided bearer MCP support;

@@ -121,6 +121,12 @@ zenture auth clear                 # delete the local record only
 | Windows | Credential Manager | implemented, not yet verified |
 | Linux | Secret Service (for example GNOME Keyring) | implemented, not yet verified |
 
+For deliberate Run recovery, save an explicit `idempotency_key` before calling
+`run` and reuse it with the same request. The named `run.idempotency_key` receipt
+is excluded from default model serialization. Cancellation requires the key to
+have been saved beforehand; receipts do not prove completion or billing. See
+[Run idempotency](./docs/mcp-client.md#run-idempotency).
+
 The six MCP tools are `run`, `attach_artifact`, `list_runs`, `get_run`,
 `cancel_run` and `record_run_outcome`, available on both peers.
 

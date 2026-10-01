@@ -113,6 +113,7 @@ class ZentureMCPError(ZentureError):
         next_action: str = "check_request",
         request_id: str | None = None,
         retry_after_seconds: int | None = None,
+        idempotency_key: str | None = None,
     ) -> None:
         self.code = code
         self.status_code = status_code
@@ -120,6 +121,7 @@ class ZentureMCPError(ZentureError):
         self.next_action = next_action
         self.request_id = request_id
         self.retry_after_seconds = retry_after_seconds
+        self.idempotency_key = idempotency_key
         super().__init__(self._safe_message())
 
     def _safe_message(self) -> str:

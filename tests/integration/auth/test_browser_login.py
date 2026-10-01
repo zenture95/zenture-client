@@ -200,6 +200,59 @@ def test_unsolicited_and_replayed_requests_are_ignored_until_the_exact_callback(
     )
 
 
+@pytest.mark.parametrize("malformed", ["query_overflow", "invalid_url", "non_ascii_state"])
+def test_malformed_request_is_rejected_without_redemption_and_valid_callback_still_succeeds(
+    env: Environment, store: RecordStore, lock_dir: Path, malformed: str
+) -> None:
+    results: dict[str, Any] = {}
+    senders: list[threading.Thread] = []
+
+    def opener(url: str) -> object:
+        query = dict(urllib.parse.parse_qsl(urllib.parse.urlsplit(url).query))
+        redirect = query["redirect_uri"]
+        targets = {
+            "query_overflow": "/oauth/callback?"
+            + urllib.parse.urlencode(
+                {"state": query["state"], **{f"extra{i}": "x" for i in range(16)}}
+            ),
+            "invalid_url": "http://[invalid/oauth/callback",
+            "non_ascii_state": "/oauth/callback?state=%C3%A9&code=c&iss=i",
+        }
+
+        def drive() -> None:
+            try:
+                results["bad"] = _callback_response(redirect, "", target=targets[malformed])
+                results["redemptions_after_bad"] = len(env.issuer.token_requests)
+                location = httpx.get(url, follow_redirects=False).headers["location"]
+                results["good"] = httpx.get(location, timeout=5)
+            except Exception as exc:
+                results["sender_error"] = type(exc).__name__
+
+        sender = threading.Thread(target=drive)
+        senders.append(sender)
+        sender.start()
+        return True
+
+    login_error: str | None = None
+    session = None
+    try:
+        session = _login(env, store, lock_dir, opener, login_timeout=5)
+    except (ValueError, TypeError) as exc:
+        login_error = type(exc).__name__
+    finally:
+        for sender in senders:
+            sender.join(6)
+
+    assert login_error is None, "malformed callback must not abort login"
+    assert session is not None
+    assert "sender_error" not in results
+    assert results["bad"].startswith("HTTP/1.1 400 Bad Request\r\n")
+    assert results["redemptions_after_bad"] == 0
+    assert results["good"].status_code == 200
+    assert session.binding.sub == "user-1"
+    assert len(env.issuer.token_requests) == 1
+
+
 @pytest.mark.parametrize("variant", ["omit_iss", "wrong_iss"])
 def test_missing_or_wrong_iss_is_rejected_before_redemption(
     env: Environment, store: RecordStore, lock_dir: Path, variant: str
@@ -367,12 +420,11 @@ def test_native_store_unavailable_fails_before_the_browser_opens(
     assert caught.value.next_action == "use_session_only"
 
 
-def _callback_response(redirect: str, port_query: str) -> str:
-    target = urllib.parse.urlsplit(redirect)
-    with socket.create_connection((target.hostname or "", target.port or 0), timeout=5) as conn:
-        conn.sendall(
-            f"GET {target.path}?{port_query} HTTP/1.1\r\nHost: {target.netloc}\r\n\r\n".encode()
-        )
+def _callback_response(redirect: str, port_query: str, *, target: str | None = None) -> str:
+    address = urllib.parse.urlsplit(redirect)
+    request_target = target if target is not None else f"{address.path}?{port_query}"
+    with socket.create_connection((address.hostname or "", address.port or 0), timeout=5) as conn:
+        conn.sendall(f"GET {request_target} HTTP/1.1\r\nHost: {address.netloc}\r\n\r\n".encode())
         received = b""
         while chunk := conn.recv(4096):
             received += chunk

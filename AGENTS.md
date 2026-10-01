@@ -115,7 +115,11 @@ return baseline).
 - Sync `McpClient` must not run inside a running event loop; use `AsyncMcpClient`.
 - Do not use `zenture auth clear` to revoke access; it is local only. Revocation
   happens in zenture under Zugriff & Sicherheit -> Verbindungen.
-- A `run(idempotency_key=...)` parameter does not exist for MCP; do not invent it.
+- Save a caller-owned `run(idempotency_key=...)` key before dispatch when a Run
+  must survive interruption or restart. Reuse that key and the same request for
+  deliberate recovery; never switch to a new key after an uncertain outcome.
+  Read `run.idempotency_key` or `ZentureMCPError.idempotency_key` separately from
+  model serialization; do not log keys or treat receipts as effect evidence.
 
 ## Required Commands
 

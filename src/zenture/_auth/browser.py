@@ -154,12 +154,19 @@ def _classify(
     method, target, headers = request
     if method != "GET" or headers.get("host") != host_header:
         return None
-    parsed = urlsplit(target)
-    if parsed.path != CALLBACK_PATH or parsed.fragment:
+    try:
+        parsed = urlsplit(target)
+        if parsed.path != CALLBACK_PATH or parsed.fragment:
+            return None
+        query = parse_qs(parsed.query, keep_blank_values=True, max_num_fields=16)
+    except ValueError:
         return None
-    query = parse_qs(parsed.query, keep_blank_values=True, max_num_fields=16)
     received_state = _single(query, "state")
-    if received_state is None or not hmac.compare_digest(received_state, state):
+    if (
+        received_state is None
+        or not received_state.isascii()
+        or not hmac.compare_digest(received_state, state)
+    ):
         return None
     return query
 

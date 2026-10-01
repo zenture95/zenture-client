@@ -10,11 +10,12 @@ from urllib.parse import urlsplit, urlunsplit
 
 from pydantic import Field, field_validator, model_validator
 
+from zenture._contract import PublicRunResponse
 from zenture._contract.run_references import validate_run_cursor
 from zenture.models import SDKBaseModel
 
 if TYPE_CHECKING:
-    from zenture._contract import ListRunEventsResponse, PublicRunResponse
+    from zenture._contract import ListRunEventsResponse
 
 McpToolName = Literal[
     "run",
@@ -193,6 +194,26 @@ class McpOutcomeRequest(SDKBaseModel):
         if (self.outcome == "edited") != (self.edited_artifact_ref is not None):
             raise ValueError("edited outcome requires edited_artifact_ref")
         return self
+
+
+def validate_run_idempotency_key(value: object) -> str:
+    """Validate the MCP Run identity without coercion or normalization."""
+    if not isinstance(value, str) or re.fullmatch(r"[A-Za-z0-9_-]{1,128}", value) is None:
+        raise ValueError(
+            "Run idempotency key must be 1-128 ASCII letters, digits, underscores or hyphens"
+        )
+    return value
+
+
+class McpRunResponse(PublicRunResponse):
+    """Run-only receipt; persist the named identity separately from model_dump."""
+
+    idempotency_key: str = Field(exclude=True, repr=False)
+
+    @field_validator("idempotency_key", mode="before")
+    @classmethod
+    def _identity(cls, value: object) -> str:
+        return validate_run_idempotency_key(value)
 
 
 @dataclass(frozen=True, slots=True)

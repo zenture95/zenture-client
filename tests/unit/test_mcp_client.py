@@ -132,6 +132,11 @@ class RecordingTransport:
     def call_tool(self, name: str, arguments: Mapping[str, object]) -> object:
         self.calls.append((name, arguments))
         payload = self.responses[name]
+        if name == "run" and isinstance(payload, dict):
+            payload = {
+                **cast("dict[str, object]", payload),
+                "idempotency_key": arguments["idempotency_key"],
+            }
         return _tool_result(payload)
 
 
@@ -157,7 +162,13 @@ class AsyncRecordingTransport:
 
     async def call_tool(self, name: str, arguments: Mapping[str, object]) -> object:
         self.calls.append((name, arguments))
-        return _tool_result(self.responses[name])
+        payload = self.responses[name]
+        if name == "run" and isinstance(payload, dict):
+            payload = {
+                **cast("dict[str, object]", payload),
+                "idempotency_key": arguments["idempotency_key"],
+            }
+        return _tool_result(payload)
 
 
 class RawTransport:

@@ -224,7 +224,7 @@ def _spawn(
 
 
 def _outcomes(processes: list[subprocess.Popen[str]]) -> list[str]:
-    results = []
+    results: list[str] = []
     for process in processes:
         out, _ = process.communicate(timeout=120)
         results.append(out.strip())

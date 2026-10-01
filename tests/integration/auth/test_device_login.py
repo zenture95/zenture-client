@@ -357,7 +357,10 @@ def test_public_login_accepts_device_true(
 def test_browser_that_cannot_open_points_to_device_login_without_starting_one(
     env: Environment, store: RecordStore, lock_dir: Path
 ) -> None:
-    runtime = runtime_for(store, lock_dir, lambda _url: False)
+    def unavailable_browser(_url: str) -> bool:
+        return False
+
+    runtime = runtime_for(store, lock_dir, unavailable_browser)
 
     with pytest.raises(AuthUnavailable) as raised:
         LoginFlow(runtime).login(endpoint=env.endpoint)

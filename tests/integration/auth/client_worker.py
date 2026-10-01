@@ -24,10 +24,14 @@ def _wait(start_at: float) -> None:
 
 def main_worker() -> None:
     config = json.loads(sys.argv[1])
+
+    def unavailable_browser(_url: str) -> bool:
+        return False
+
     runtime = runtime_for(
         FileStore(Path(config["store"])),
         Path(config["lock_dir"]),
-        lambda _url: False,
+        unavailable_browser,
         lock_wait_seconds=60,
     )
     login_module.default_runtime = lambda: runtime

@@ -30,10 +30,15 @@ def test_older_session_is_refused_before_any_refresh_when_another_login_replaced
     newer = flow.login(endpoint=env.endpoint)
     newest_record = file_store.load(identity)
     assert newer.binding.connection_id == "conn-2"
-    older._core.clock = lambda: older._core._expires_at + 1  # force a refresh attempt
+    # Expire the owned test session to exercise refresh and binding guards.
+    # force a refresh attempt
+    older._core.clock = (  # pyright: ignore[reportPrivateUsage]
+        lambda: older._core._expires_at + 1  # pyright: ignore[reportPrivateUsage]
+    )
 
     with pytest.raises(AuthorizationRequired) as caught:
-        older._core.access_token()
+        # Inspect the owned test session credential cache for the auth invariant.
+        older._core.access_token()  # pyright: ignore[reportPrivateUsage]
 
     assert caught.value.code == "binding_changed"
     assert env.issuer.refresh_requests == []

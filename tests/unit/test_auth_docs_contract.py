@@ -253,6 +253,13 @@ def test_authentication_guide_exit_codes_match_the_readme() -> None:
     assert "| `6` | login cancelled (denied or declined) |" in readme
 
 
+def test_exit_code_four_does_not_promise_that_a_retry_helps() -> None:
+    # Exit 4 also covers a broken MCP dependency or protocol error, where waiting does not help.
+    expected = "unavailable: nothing changed; the message says whether retrying later helps"
+    assert f"| `4` | {expected} |" in _read(ROOT / "README.md")
+    assert expected in _read(ROOT / "src" / "zenture" / "cli.py")
+
+
 def test_refresh_safety_docs_describe_mark_then_delete_on_the_next_attempt() -> None:
     text = _read(ROOT / "docs" / "authentication.md")
     section = text.split("### Refresh safety", 1)[1].split("###", 1)[0]

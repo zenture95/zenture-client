@@ -44,7 +44,7 @@ exit codes:
   1    status: not_logged_in
   2    invalid command line
   3    authorization_required: log in again
-  4    unavailable: nothing changed, try again later
+  4    unavailable: nothing changed; the message says whether retrying later helps
   5    store_unavailable: no protected credential store (try --session-only)
   6    login cancelled (denied or declined)
   7    permission denied by the server

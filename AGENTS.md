@@ -1,13 +1,17 @@
 # AGENTS.md
 
-Purpose: onboard contributors and coding agents to the public Python SDK for
-the zenture Public API.
+Purpose: onboard contributors and coding agents to the official Python client
+for the zenture REST API and hosted MCP endpoint.
 
 ## Repository Purpose
 
-`zenture-client` is the official server-side Python SDK and the implementation
-home for the opt-in client-side MCP peer adapter. It is intended for backend
-services, workers, automation jobs, CI, evaluation pipelines, controlled
+`zenture-client` is the official server-side Python REST client and the
+implementation home for hosted MCP peers and explicit native authentication.
+The default installation includes REST, MCP, native auth, and the `zenture`
+command; no extra is required. API tokens are REST-only, account OAuth is
+MCP-only, and Backend/Engine retain authorization, execution, billing, and
+tenant authority. The package provides no local MCP server. It is intended
+for backend services, workers, automation jobs, CI, evaluation pipelines, controlled
 notebooks and governed MCP-consuming clients. It is not for browsers, mobile
 apps, or frontend bundles.
 
@@ -85,15 +89,17 @@ When adding or changing a resource:
 
 When a new Engine capability is intended for client consumption, extend this
 repository's canonical contract models and both peer surfaces: the API
-resource and the opt-in MCP adapter. Add sync/async parity and cross-channel
+resource and the hosted MCP peers. Add sync/async parity and cross-channel
 acceptance tests here before release promotion; do not create a workspace-only client duplicate or move Engine/business authority into the
 SDK.
 
 ## Using zenture as an agent
 
 Contracts: [`README.md`](./README.md) (quickstart, errors, exit codes),
-[`docs/authentication.md`](./docs/authentication.md) and
-[`docs/mcp-client.md`](./docs/mcp-client.md).
+[`docs/authentication.md`](./docs/authentication.md),
+[`docs/mcp-client.md`](./docs/mcp-client.md), and
+[`docs/migration.md`](./docs/migration.md) (uninstall-first upgrade and published
+return baseline).
 
 - Check the connection with `zenture auth status` (exit code 0 means connected).
   Only a human at a terminal should run `zenture auth login`; explain what is

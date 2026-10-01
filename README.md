@@ -2,7 +2,11 @@
 
 # The official zenture Python client
 
-Official server-side only Python SDK for the zenture Public API.
+Official Python client for the zenture REST API and hosted MCP endpoint.
+The default installation includes REST, hosted MCP, and native authentication;
+no extra is required. API tokens stay bound to REST, and account OAuth stays
+bound to MCP. The server retains authorization, Run execution, billing, and
+tenant authority; this package provides no local MCP server.
 
 `zenture` is for backend services, automation jobs, evaluation pipelines,
 CI tasks, and controlled notebook environments. zenture API tokens are
@@ -22,6 +26,9 @@ tokens stay a separate credential.
 Previously published artifacts remain the return path if the source migration
 cannot yet be applied; do not install both distributions into one environment.
 Candidate artifact checks do not establish public PyPI availability.
+See the [migration guide](./docs/migration.md) for uninstall-first upgrade
+commands, source changes, the exact published return baseline, and verification
+limits.
 
 ## Package Names
 
@@ -215,8 +222,9 @@ The MCP peer clients are documented in
 
 ## Agent And Interface Governance
 
-**Repository role:** This repository implements the server-side Python Public
-API client and the opt-in MCP peer adapter. Its committed OpenAPI artifact is
+**Repository role:** This repository implements the server-side Python REST
+API client, hosted MCP peers, and explicit native authentication, all included
+in the default installation. Its committed OpenAPI artifact is
 the SDK-local contract mirror, not the authority for Backend product behavior
 or gateway routes.
 

@@ -180,6 +180,14 @@ def test_mcp_docs_name_the_six_tools_and_both_peers() -> None:
         assert hasattr(AsyncMcpClient, tool)
     for peer in ("McpClient", "AsyncMcpClient", "login_async"):
         assert peer in mcp or peer in _read(ROOT / "README.md")
+    for claim in (
+        "The five core tools are",
+        "`attach_artifact`",
+        "approved resolver",
+        "host-selected resolver",
+        "require_product_tools()` checks",
+    ):
+        assert claim in mcp, claim
 
 
 @pytest.mark.parametrize("path", EXAMPLES, ids=lambda p: p.name)

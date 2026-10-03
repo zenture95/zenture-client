@@ -22,7 +22,6 @@ from zenture._contract import (
     RunProfile,
 )
 from zenture._mcp.contracts import (
-    PRODUCT_TOOL_NAMES,
     McpArtifactRequest,
     McpEndpoint,
     McpFindingAdjudication,
@@ -48,6 +47,9 @@ _OMITTED_RUN_KEY = object()
 
 _MAX_ARGUMENT_BYTES = 256 * 1024
 _MAX_RESULT_BYTES = 256 * 1024
+_REQUIRED_PRODUCT_TOOL_NAMES = frozenset(
+    {"run", "list_runs", "get_run", "cancel_run", "record_run_outcome"}
+)
 _TOOL_NAME = re.compile(r"^[a-z][a-z0-9_.:-]{0,127}$")
 _FORBIDDEN_KEYS = frozenset(
     {
@@ -359,7 +361,7 @@ class McpClient:
 
     def require_product_tools(self) -> None:
         names = set(self.list_tools())
-        if not set(PRODUCT_TOOL_NAMES).issubset(names):
+        if not _REQUIRED_PRODUCT_TOOL_NAMES.issubset(names):
             raise ZentureMCPProtocolError("tool_catalog_incomplete")
 
     def _call(self, name: str, arguments: Mapping[str, object]) -> dict[str, object]:
@@ -575,7 +577,7 @@ class AsyncMcpClient:
 
     async def require_product_tools(self) -> None:
         names = set(await self.list_tools())
-        if not set(PRODUCT_TOOL_NAMES).issubset(names):
+        if not _REQUIRED_PRODUCT_TOOL_NAMES.issubset(names):
             raise ZentureMCPProtocolError("tool_catalog_incomplete")
 
     async def _call(self, name: str, arguments: Mapping[str, object]) -> dict[str, object]:

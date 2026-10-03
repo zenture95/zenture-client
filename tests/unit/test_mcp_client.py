@@ -141,23 +141,19 @@ class RecordingTransport:
 
 
 class AsyncRecordingTransport:
-    def __init__(self, responses: dict[str, object]) -> None:
+    def __init__(
+        self,
+        responses: dict[str, object],
+        *,
+        tool_names: tuple[str, ...] = PRODUCT_TOOL_NAMES,
+    ) -> None:
         self.responses = responses
+        self.tool_names = tool_names
         self.calls: list[tuple[str, Mapping[str, object]]] = []
 
     async def list_tools(self) -> object:
         return {
-            "tools": [
-                {"name": name}
-                for name in (
-                    "run",
-                    "attach_artifact",
-                    "list_runs",
-                    "get_run",
-                    "cancel_run",
-                    "record_run_outcome",
-                )
-            ]
+            "tools": [{"name": name} for name in self.tool_names]
         }
 
     async def call_tool(self, name: str, arguments: Mapping[str, object]) -> object:
@@ -696,6 +692,47 @@ async def test_async_mcp_client_preserves_typed_transport_errors() -> None:
 def test_mcp_client_requires_the_complete_product_catalog() -> None:
     with pytest.raises(ZentureMCPProtocolError, match="tool_catalog_incomplete"):
         McpClient(RecordingTransport(_responses(), tool_names=("run",))).require_product_tools()
+
+
+CORE_PRODUCT_TOOL_NAMES = tuple(name for name in PRODUCT_TOOL_NAMES if name != "attach_artifact")
+
+
+def test_sync_mcp_client_accepts_core_catalog_without_optional_artifact_tool() -> None:
+    client = McpClient(RecordingTransport(_responses(), tool_names=CORE_PRODUCT_TOOL_NAMES))
+
+    client.require_product_tools()
+
+    assert client.list_tools() == CORE_PRODUCT_TOOL_NAMES
+    assert callable(client.attach_artifact)
+
+
+@pytest.mark.parametrize("missing_name", CORE_PRODUCT_TOOL_NAMES)
+def test_sync_mcp_client_rejects_each_missing_core_tool(missing_name: str) -> None:
+    names = tuple(name for name in PRODUCT_TOOL_NAMES if name != missing_name)
+    with pytest.raises(ZentureMCPProtocolError, match="tool_catalog_incomplete"):
+        McpClient(RecordingTransport(_responses(), tool_names=names)).require_product_tools()
+
+
+@pytest.mark.asyncio
+async def test_async_mcp_client_accepts_core_catalog_without_optional_artifact_tool() -> None:
+    client = AsyncMcpClient(
+        AsyncRecordingTransport(_responses(), tool_names=CORE_PRODUCT_TOOL_NAMES)
+    )
+
+    await client.require_product_tools()
+
+    assert await client.list_tools() == CORE_PRODUCT_TOOL_NAMES
+    assert callable(client.attach_artifact)
+
+
+@pytest.mark.parametrize("missing_name", CORE_PRODUCT_TOOL_NAMES)
+@pytest.mark.asyncio
+async def test_async_mcp_client_rejects_each_missing_core_tool(missing_name: str) -> None:
+    names = tuple(name for name in PRODUCT_TOOL_NAMES if name != missing_name)
+    client = AsyncMcpClient(AsyncRecordingTransport(_responses(), tool_names=names))
+
+    with pytest.raises(ZentureMCPProtocolError, match="tool_catalog_incomplete"):
+        await client.require_product_tools()
 
 
 def test_mcp_client_replay_requires_an_explicit_replay_page() -> None:

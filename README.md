@@ -127,8 +127,12 @@ is excluded from default model serialization. Cancellation requires the key to
 have been saved beforehand; receipts do not prove completion or billing. See
 [Run idempotency](./docs/mcp-client.md#run-idempotency).
 
-The six MCP tools are `run`, `attach_artifact`, `list_runs`, `get_run`,
-`cancel_run` and `record_run_outcome`, available on both peers.
+The Client supports six known MCP tool methods: `run`, `attach_artifact`,
+`list_runs`, `get_run`, `cancel_run` and `record_run_outcome`. Its readiness
+check requires the five core tools; `attach_artifact` is optional and is
+available only when the host advertises it with an approved artifact resolver.
+Artifact bytes come from that host-selected source and are not carried in MCP
+JSON. See [the MCP Client guide](./docs/mcp-client.md) for details.
 
 Synchronous (from ordinary code, not from inside a running event loop):
 

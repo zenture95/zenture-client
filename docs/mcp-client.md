@@ -62,20 +62,24 @@ A caller that already owns a credential can instead pass
 `bearer_token=<async callable returning the token>`. The client then does not
 refresh, store or log it.
 
-## The six tools
+## Supported tools
 
 | Tool | Method | Purpose |
 |---|---|---|
 | `run` | `run(task=..., artifact=..., profile="standard", idempotency_key=...)` | Start a Run |
-| `attach_artifact` | `attach_artifact(file_name=..., mime_type=..., byte_size=..., content_hash=...)` | Register an artifact upload |
+| `attach_artifact` | `attach_artifact(file_name=..., mime_type=..., byte_size=..., content_hash=...)` | Register an artifact upload when the host provides an approved artifact resolver |
 | `list_runs` | `list_runs(status=..., limit=5, cursor=...)` | List Runs, one bounded page |
 | `get_run` | `get_run(run_id, view="summary" or "full", replay_cursor=...)` | Read a Run, optionally with one replay page |
 | `cancel_run` | `cancel_run(run_id)` | Cancel a Run |
 | `record_run_outcome` | `record_run_outcome(run_id, outcome=...)` | Record what you did with the result |
 
-`replay_events(...)` is bounded and never pages automatically. Artifact bytes are
-not carried in MCP JSON; the server answers `artifact_unavailable` when the byte
-source is not available.
+The five core tools are `run`, `list_runs`, `get_run`, `cancel_run` and
+`record_run_outcome`. The host may also advertise `attach_artifact` when it has
+an approved resolver for the artifact bytes. `require_product_tools()` checks
+only the five core tools, so a host without that resolver is still ready for
+Runs. Artifact bytes come from the host-selected resolver and are not carried
+in MCP JSON; the server answers `artifact_unavailable` when that source is not
+available. `replay_events(...)` is bounded and never pages automatically.
 
 ## Behavior to rely on
 

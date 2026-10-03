@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import base64
+import contextlib
 import hashlib
 import json
 import select
@@ -474,6 +475,105 @@ def test_stalled_local_connection_does_not_delay_the_real_callback() -> None:
 
     assert result.code == "c"
     assert elapsed < 1.5
+
+
+def test_stray_request_with_unread_body_still_gets_its_response_and_the_callback_survives() -> None:
+    listener, redirect = bind_loopback()
+    parts = urllib.parse.urlsplit(redirect)
+    outcome: dict[str, Any] = {}
+
+    def serve() -> None:
+        outcome["result"] = wait_for_callback(
+            listener,
+            redirect_uri=redirect,
+            state="state-1",
+            verifier="verifier-1",
+            issuer="https://issuer.example",
+            timeout=20,
+        )
+
+    server = threading.Thread(target=serve, daemon=True)
+    server.start()
+
+    def exchange(request: bytes) -> bytes:
+        with socket.create_connection((parts.hostname or "", parts.port or 0), timeout=10) as peer:
+            peer.sendall(request)
+            received = bytearray()
+            while chunk := peer.recv(4096):
+                received.extend(chunk)
+            return bytes(received)
+
+    body = b"x" * 12_000
+    stray = (
+        f"POST {parts.path} HTTP/1.1\r\nHost: {parts.netloc}\r\nContent-Length: {len(body)}\r\n\r\n"
+    ).encode("ascii") + body
+    assert exchange(stray).startswith(b"HTTP/1.1 400")
+
+    good = (
+        f"GET {parts.path}?state=state-1&code=real-code&iss=https%3A%2F%2Fissuer.example "
+        f"HTTP/1.1\r\nHost: {parts.netloc}\r\n\r\n"
+    ).encode("ascii")
+    assert exchange(good).startswith(b"HTTP/1.1 200")
+    server.join(timeout=20)
+    assert outcome["result"].code == "real-code"
+
+
+def test_draining_a_trickling_peer_is_bounded_in_total_time() -> None:
+    from zenture._auth import browser
+
+    ours, peer = socket.socketpair()
+    stop = threading.Event()
+
+    def trickle() -> None:
+        with contextlib.suppress(OSError):
+            deadline = time.monotonic() + 3.0
+            while not stop.is_set() and time.monotonic() < deadline:
+                peer.sendall(b"x")
+                time.sleep(0.05)
+            peer.shutdown(socket.SHUT_WR)
+
+    sender = threading.Thread(target=trickle, daemon=True)
+    sender.start()
+    try:
+        started = time.monotonic()
+        browser._drain_before_close(ours)  # pyright: ignore[reportPrivateUsage]
+        elapsed = time.monotonic() - started
+    finally:
+        stop.set()
+        ours.close()
+        peer.close()
+        sender.join(timeout=2)
+    assert elapsed < 1.0
+
+
+def test_reading_a_trickling_request_head_is_bounded_in_total_time() -> None:
+    from zenture._auth import browser
+
+    ours, peer = socket.socketpair()
+    stop = threading.Event()
+
+    def trickle() -> None:
+        with contextlib.suppress(OSError):
+            deadline = time.monotonic() + 4.0
+            peer.sendall(b"GET /oauth/callback HTTP/1.1\r\n")
+            while not stop.is_set() and time.monotonic() < deadline:
+                peer.sendall(b"X")
+                time.sleep(0.05)
+            peer.shutdown(socket.SHUT_WR)
+
+    sender = threading.Thread(target=trickle, daemon=True)
+    sender.start()
+    try:
+        started = time.monotonic()
+        result = browser._read_request(ours)  # pyright: ignore[reportPrivateUsage]
+        elapsed = time.monotonic() - started
+    finally:
+        stop.set()
+        ours.close()
+        peer.close()
+        sender.join(timeout=2)
+    assert result is None
+    assert elapsed < 3.0
 
 
 class _RecordingSocket:

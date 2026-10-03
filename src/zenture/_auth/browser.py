@@ -28,7 +28,10 @@ CALLBACK_PATH = "/oauth/callback"
 LOGIN_TIMEOUT_SECONDS = 600.0
 _MAX_REQUEST_BYTES = 16 * 1024
 _CONNECTION_READ_SECONDS = 0.5
+_REQUEST_READ_TOTAL_SECONDS = 2.0
 _SLICE_SECONDS = 0.2
+_DRAIN_SECONDS = 0.25
+_MAX_DRAIN_BYTES = 64 * 1024
 _PAGE = (
     b"<!doctype html><html lang=en><meta charset=utf-8><title>zenture</title>"
     b"<body><p>%s</p></body></html>"
@@ -101,10 +104,14 @@ def authorization_url(
 
 
 def _read_request(connection: socket.socket) -> tuple[str, str, dict[str, str]] | None:
-    connection.settimeout(_CONNECTION_READ_SECONDS)
+    deadline = time.monotonic() + _REQUEST_READ_TOTAL_SECONDS
     received = bytearray()
     try:
         while b"\r\n\r\n" not in received:
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                return None
+            connection.settimeout(min(_CONNECTION_READ_SECONDS, remaining))
             chunk = connection.recv(4096)
             if not chunk:
                 return None
@@ -135,6 +142,27 @@ def _respond(connection: socket.socket, status: str, message: str) -> None:
     ).encode("ascii")
     with contextlib.suppress(OSError):
         connection.sendall(head + body)
+        _drain_before_close(connection)
+
+
+def _drain_before_close(connection: socket.socket) -> None:
+    """Half-close writes and discard bounded unread request bytes before close."""
+
+    connection.shutdown(socket.SHUT_WR)
+    deadline = time.monotonic() + _DRAIN_SECONDS
+    remaining = _MAX_DRAIN_BYTES
+    while remaining > 0:
+        seconds_left = deadline - time.monotonic()
+        if seconds_left <= 0:
+            return
+        connection.settimeout(seconds_left)
+        try:
+            chunk = connection.recv(4096)
+        except TimeoutError:
+            return
+        if not chunk:
+            return
+        remaining -= len(chunk)
 
 
 def _single(query: dict[str, list[str]], key: str) -> str | None:

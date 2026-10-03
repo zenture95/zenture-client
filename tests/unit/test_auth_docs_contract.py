@@ -37,6 +37,10 @@ def _read(path: Path) -> str:
     return path.read_text(encoding="utf-8")
 
 
+def _windows_runtime() -> dict[str, str]:
+    return {key: os.environ[key] for key in ("SYSTEMROOT", "WINDIR") if key in os.environ}
+
+
 @cache
 def _help(*words: str) -> str:
     result = subprocess.run(
@@ -45,11 +49,7 @@ def _help(*words: str) -> str:
         capture_output=True,
         text=True,
         check=True,
-        env={
-            "PYTHONPATH": str(ROOT / "src"),
-            "PATH": "",
-            **({"SystemRoot": os.environ["SYSTEMROOT"]} if os.name == "nt" else {}),
-        },
+        env={"PYTHONPATH": str(ROOT / "src"), "PATH": "", **_windows_runtime()},
     )
     return result.stdout
 
@@ -207,11 +207,7 @@ def test_examples_import_quietly_and_print_help_without_network(path: Path) -> N
         capture_output=True,
         text=True,
         check=False,
-        env={
-            "PYTHONPATH": str(ROOT / "src"),
-            "PATH": "",
-            **({"SystemRoot": os.environ["SYSTEMROOT"]} if os.name == "nt" else {}),
-        },
+        env={"PYTHONPATH": str(ROOT / "src"), "PATH": "", **_windows_runtime()},
     )
     assert result.returncode == 0, result.stderr[-300:]
     assert "usage:" in result.stdout.lower()
@@ -271,6 +267,23 @@ def test_ci_and_python_support_wording_claims_nothing_that_was_not_run() -> None
     assert "Python 3.14 is declared; the CI matrix covers it but has not yet run" in readme
     assert "run the CI matrix" not in changelog
     assert "configured" in changelog
+
+
+def test_workflow_actions_and_ci_build_tool_are_pinned() -> None:
+    workflows = sorted((ROOT / ".github" / "workflows").glob("*.yml"))
+    uses = [
+        line.strip()
+        for path in workflows
+        for line in _read(path).splitlines()
+        if line.strip().startswith(("uses:", "- uses:"))
+    ]
+    assert uses
+    for line in uses:
+        assert re.fullmatch(r"-? ?uses: [\w./-]+@[0-9a-f]{40} # v\d+(\.\d+){0,2}", line), line
+    development = _read(ROOT / ".github" / "workflows" / "development.yml")
+    release = _read(ROOT / ".github" / "workflows" / "release.yml")
+    assert development.count('"hatchling==1.32.4"') == 2
+    assert '"hatchling==1.32.4"' in release
 
 
 def test_authentication_guide_exit_codes_match_the_readme() -> None:

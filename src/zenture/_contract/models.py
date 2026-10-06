@@ -56,6 +56,7 @@ class PublicErrorCode(StrEnum):
     OPERATION_EXPIRED = "operation_expired"
     PROPOSAL_EXPIRED = "proposal_expired"
     PROPOSAL_HASH_MISMATCH = "proposal_hash_mismatch"
+    PREDECESSOR_RUN_INVALID = "predecessor_run_invalid"
     ACCOUNT_REQUIRED = "account_required"
     ARTIFACT_REQUIRED = "artifact_required"
     ARTIFACT_AMBIGUOUS = "artifact_ambiguous"
@@ -534,6 +535,12 @@ class PrepareKnowledgeRunRequest(SDKBaseModel):
 class CreateRunRequest(SDKBaseModel):
     proposal_id: UUID
     proposal_hash: str = Field(pattern=r"^[a-f0-9]{64}$")
+    predecessor_run_id: str | None = Field(
+        default=None,
+        pattern=r"^run_[A-Za-z0-9_-]{3,128}$",
+        max_length=132,
+        description="Optional public reference of one of your finished Runs that this Run follows.",
+    )
 
     @field_validator("proposal_id", mode="before")
     @classmethod

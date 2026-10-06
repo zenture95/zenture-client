@@ -702,6 +702,7 @@ Request body example:
 
 ```json
 {
+  "predecessor_run_id": "example",
   "proposal_hash": "example",
   "proposal_id": "example"
 }
@@ -1304,6 +1305,7 @@ Stable public gateway error codes are:
 - `operation_expired`
 - `proposal_expired`
 - `proposal_hash_mismatch`
+- `predecessor_run_invalid`
 - `account_required`
 - `artifact_required`
 - `artifact_ambiguous`

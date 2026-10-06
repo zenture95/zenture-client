@@ -180,14 +180,19 @@ class AsyncRunsResource:
         proposal_hash: str,
         idempotency_key: str,
         wait: int | None = None,
+        predecessor_run_id: str | None = None,
     ) -> PublicRunResponse:
         body = CreateRunRequest.model_validate(
-            {"proposal_id": proposal_id, "proposal_hash": proposal_hash}
+            {
+                "proposal_id": proposal_id,
+                "proposal_hash": proposal_hash,
+                "predecessor_run_id": predecessor_run_id,
+            }
         )
         headers = idempotency_headers(phase_key(idempotency_key, "create"))
         add_wait_header(headers, wait)
         payload = await self._transport.request_json(
-            "POST", "/runs", headers=headers, json=body.model_dump(mode="json")
+            "POST", "/runs", headers=headers, json=body.model_dump(mode="json", exclude_none=True)
         )
         return parse_response(PublicRunResponse, payload)
 
@@ -199,6 +204,7 @@ class AsyncRunsResource:
         idempotency_key: str,
         profile: str = "standard",
         wait: int | None = None,
+        predecessor_run_id: str | None = None,
     ) -> PublicRunResponse:
         proposal = await self.prepare(
             task=task,
@@ -211,6 +217,7 @@ class AsyncRunsResource:
             proposal_hash=proposal.proposal_hash,
             idempotency_key=idempotency_key,
             wait=wait,
+            predecessor_run_id=predecessor_run_id,
         )
 
     async def list(

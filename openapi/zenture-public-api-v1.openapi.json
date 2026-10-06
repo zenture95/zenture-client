@@ -389,6 +389,12 @@
       "CreateRunRequest": {
         "additionalProperties": false,
         "properties": {
+          "predecessor_run_id": {
+            "description": "Optional public reference of one of your finished Runs that this Run follows. It is part of the request identity for the Idempotency-Key; an unknown, foreign or ineligible Run is rejected with predecessor_run_invalid.",
+            "maxLength": 132,
+            "pattern": "^run_[A-Za-z0-9_-]{3,128}$",
+            "type": "string"
+          },
           "proposal_hash": {
             "pattern": "^[a-f0-9]{64}$",
             "type": "string"
@@ -500,6 +506,9 @@
           "mode": {
             "const": "prompt_improvement",
             "description": "Only supported input wizard mode.",
+            "enum": [
+              "prompt_improvement"
+            ],
             "title": "Mode",
             "type": "string"
           },
@@ -927,6 +936,7 @@
           "operation_expired",
           "proposal_expired",
           "proposal_hash_mismatch",
+          "predecessor_run_invalid",
           "account_required",
           "artifact_required",
           "artifact_ambiguous",
@@ -1533,6 +1543,7 @@
         "enum": [
           "proposal_expired",
           "proposal_hash_mismatch",
+          "predecessor_run_invalid",
           "account_required",
           "artifact_required",
           "artifact_ambiguous",
@@ -6856,6 +6867,7 @@
           "operation_expired",
           "proposal_expired",
           "proposal_hash_mismatch",
+          "predecessor_run_invalid",
           "account_required",
           "artifact_required",
           "artifact_ambiguous",
@@ -7163,6 +7175,7 @@
           "operation_expired",
           "proposal_expired",
           "proposal_hash_mismatch",
+          "predecessor_run_invalid",
           "account_required",
           "artifact_required",
           "artifact_ambiguous",
@@ -7515,6 +7528,7 @@
           "operation_expired",
           "proposal_expired",
           "proposal_hash_mismatch",
+          "predecessor_run_invalid",
           "account_required",
           "artifact_required",
           "artifact_ambiguous",
@@ -7859,6 +7873,7 @@
           "operation_expired",
           "proposal_expired",
           "proposal_hash_mismatch",
+          "predecessor_run_invalid",
           "account_required",
           "artifact_required",
           "artifact_ambiguous",
@@ -8175,6 +8190,7 @@
           "operation_expired",
           "proposal_expired",
           "proposal_hash_mismatch",
+          "predecessor_run_invalid",
           "account_required",
           "artifact_required",
           "artifact_ambiguous",
@@ -8483,6 +8499,7 @@
           "operation_expired",
           "proposal_expired",
           "proposal_hash_mismatch",
+          "predecessor_run_invalid",
           "account_required",
           "artifact_required",
           "artifact_ambiguous",
@@ -8789,6 +8806,7 @@
           "operation_expired",
           "proposal_expired",
           "proposal_hash_mismatch",
+          "predecessor_run_invalid",
           "account_required",
           "artifact_required",
           "artifact_ambiguous",
@@ -9105,6 +9123,7 @@
           "operation_expired",
           "proposal_expired",
           "proposal_hash_mismatch",
+          "predecessor_run_invalid",
           "account_required",
           "artifact_required",
           "artifact_ambiguous",
@@ -9409,6 +9428,7 @@
           "operation_expired",
           "proposal_expired",
           "proposal_hash_mismatch",
+          "predecessor_run_invalid",
           "account_required",
           "artifact_required",
           "artifact_ambiguous",
@@ -9715,6 +9735,7 @@
           "operation_expired",
           "proposal_expired",
           "proposal_hash_mismatch",
+          "predecessor_run_invalid",
           "account_required",
           "artifact_required",
           "artifact_ambiguous",

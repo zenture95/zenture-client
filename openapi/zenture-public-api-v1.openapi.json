@@ -390,7 +390,7 @@
         "additionalProperties": false,
         "properties": {
           "predecessor_run_id": {
-            "description": "Optional public reference of one of your finished Runs that this Run follows. It is part of the request identity for the Idempotency-Key; an unknown, foreign or ineligible Run is rejected with predecessor_run_invalid.",
+            "description": "Optional public reference of one of your finished Runs that this Run follows. It is part of the request identity for the Idempotency-Key; an unknown, foreign or ineligible Run is rejected with predecessor_run_invalid, and replaying the same key with another predecessor_run_id is rejected with idempotency_conflict.",
             "maxLength": 132,
             "pattern": "^run_[A-Za-z0-9_-]{3,128}$",
             "type": "string"
@@ -506,9 +506,6 @@
           "mode": {
             "const": "prompt_improvement",
             "description": "Only supported input wizard mode.",
-            "enum": [
-              "prompt_improvement"
-            ],
             "title": "Mode",
             "type": "string"
           },

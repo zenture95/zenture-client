@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+- Added immutable typed validation `issues` on REST and MCP errors, bounded by
+  public field schemas, and content-free local Run `ValidationError` summaries.
+  Sync/async REST Run and artifact requests automatically negotiate safe details
+  with `X-Zenture-Error-Details: issues`; older servers remain supported.
+
+- Added sync/async `get_tool_catalog()` and public `zenture.mcp.McpToolDefinition`
+  for detached registered schemas, descriptions and annotations, with bounded
+  complete pagination. Existing name-only `list_tools()` behavior is preserved.
+
 - MCP Run peers now allocate or accept a strict caller-owned idempotency key and
   expose validated Run-only success/error receipts for deliberate recovery.
   Save an explicit key before interruption; default model serialization and
@@ -79,3 +88,5 @@ state.
   models, model discovery, single-/multi-model chat, evaluation creation,
   operation reads, billing, usage, limits, idempotency, retry, timeout and
   polling primitives.
+
+- Add sync/async MCP `wait_run` with finite deadlines, same-Run summary observation, safe read retries and official per-call read budgets.

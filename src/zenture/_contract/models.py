@@ -9,14 +9,22 @@ from enum import StrEnum
 from typing import Annotated, Any, Literal, Self, cast
 from uuid import UUID
 
-from pydantic import AwareDatetime, ConfigDict, Field, field_validator, model_validator
+from pydantic import (
+    AwareDatetime,
+    ConfigDict,
+    Field,
+    field_validator,
+    model_validator,
+)
 
 from zenture._contract.run_references import (
     RUN_CURSOR_PATTERN,
     validate_run_cursor,
     validate_terminal_refs,
 )
+from zenture._request_validation import SafeRunRequestModel as _RunRequestModel
 from zenture.models import SDKBaseModel
+from zenture.validation_issues import ValidationIssue, safe_issues
 
 _ARTIFACT_REF_RE = re.compile(r"^art_[A-Za-z0-9_-]{3,128}$")
 _SAFE_ARTIFACT_REF_RE = re.compile(r"^[A-Za-z][A-Za-z0-9_./:-]*:[A-Za-z0-9_./:-]{1,479}$")
@@ -115,6 +123,12 @@ class PublicError(SDKBaseModel):
 
     code: PublicErrorCode
     message: str = Field(min_length=1)
+    issues: tuple[ValidationIssue, ...] = ()
+
+    @field_validator("issues", mode="before")
+    @classmethod
+    def _issues(cls, value: object) -> tuple[ValidationIssue, ...]:
+        return safe_issues(value)
 
     @field_validator("code", mode="before")
     @classmethod
@@ -431,6 +445,34 @@ class RunProfile(StrEnum):
     DETAILED = "detailed"
 
 
+class RunParameterSchema(SDKBaseModel):
+    """Public route/query/header declarations for safe error-detail provenance."""
+
+    run_id: str = Field(pattern=r"^run_[A-Za-z0-9_-]{3,128}$", max_length=132)
+    idempotency_key: str = Field(min_length=1, max_length=128, pattern=r"^[A-Za-z0-9_-]{1,128}$")
+    status: list[Literal["active", "completed", "succeeded", "failed", "cancelled"]]
+    decision: list[Literal["ready", "revise", "human_review", "insufficient_evidence"]]
+    profile: list[Literal["fast", "standard", "detailed"]]
+    created_after: str = Field(json_schema_extra={"format": "date-time"})
+    created_before: str = Field(json_schema_extra={"format": "date-time"})
+    limit: int = Field(ge=1, le=50)
+    cursor: str = Field(min_length=1, max_length=512)
+
+
+class RunHeaderSchema(SDKBaseModel):
+    """Declared public header facts for sanitation; never used for local admission."""
+
+    idempotency_key: str = Field(alias="Idempotency-Key", min_length=1, max_length=255)
+    content_length: int = Field(
+        alias="Content-Length", ge=0, le=10 * 1024 * 1024,
+        json_schema_extra={"x-validation-unit": "bytes"},
+    )
+    last_event_id: str = Field(alias="Last-Event-ID", min_length=1, max_length=512)
+    prefer: str = Field(alias="Prefer")
+    content_type: str = Field(alias="Content-Type")
+    upload_id: str = Field(alias="X-Upload-ID")
+
+
 class RunStatus(StrEnum):
     CREATED = "created"
     QUEUED = "queued"
@@ -453,7 +495,7 @@ class PublicDecision(StrEnum):
     INSUFFICIENT_EVIDENCE = "insufficient_evidence"
 
 
-class RunTextArtifact(SDKBaseModel):
+class RunTextArtifact(_RunRequestModel):
     type: Literal["text"]
     value: str = Field(min_length=1, max_length=50_000)
 
@@ -465,7 +507,7 @@ class RunTextArtifact(SDKBaseModel):
         return value
 
 
-class RunReferenceArtifact(SDKBaseModel):
+class RunReferenceArtifact(_RunRequestModel):
     type: Literal["zenture_ref"]
     value: str = Field(min_length=7, max_length=132, pattern=r"^art_[A-Za-z0-9_-]{3,128}$")
 
@@ -473,10 +515,12 @@ class RunReferenceArtifact(SDKBaseModel):
 RunArtifact = Annotated[RunTextArtifact | RunReferenceArtifact, Field(discriminator="type")]
 
 
-class ArtifactUploadRequest(SDKBaseModel):
+class ArtifactUploadRequest(_RunRequestModel):
     file_name: str = Field(min_length=1, max_length=255)
     mime_type: str = Field(min_length=1, max_length=127)
-    byte_size: int = Field(ge=1, le=10 * 1024 * 1024)
+    byte_size: int = Field(
+        ge=1, le=10 * 1024 * 1024, json_schema_extra={"x-validation-unit": "bytes"}
+    )
     content_hash: str = Field(pattern=r"^[a-f0-9]{64}$")
     upload_id: str | None = Field(
         default=None, min_length=8, max_length=128, pattern=r"^upload_[A-Za-z0-9_-]{8,128}$"
@@ -515,7 +559,7 @@ class SignedUploadResponse(SDKBaseModel):
         return _coerce_aware_datetime(value)
 
 
-class PrepareKnowledgeRunRequest(SDKBaseModel):
+class PrepareKnowledgeRunRequest(_RunRequestModel):
     task: str = Field(min_length=1, max_length=20_000)
     artifact: RunArtifact
     profile: RunProfile = RunProfile.STANDARD
@@ -533,7 +577,7 @@ class PrepareKnowledgeRunRequest(SDKBaseModel):
         return RunProfile(value) if isinstance(value, str) else value
 
 
-class CreateRunRequest(SDKBaseModel):
+class CreateRunRequest(_RunRequestModel):
     proposal_id: UUID
     proposal_hash: str = Field(pattern=r"^[a-f0-9]{64}$")
     predecessor_run_id: str | None = Field(
@@ -551,12 +595,12 @@ class CreateRunRequest(SDKBaseModel):
         return UUID(str(value))
 
 
-class FindingAdjudication(SDKBaseModel):
+class FindingAdjudication(_RunRequestModel):
     finding_ref: str = Field(min_length=1, max_length=128)
     outcome: Literal["confirmed", "rejected", "partially_valid", "not_sure"]
 
 
-class RecordRunOutcomeRequest(SDKBaseModel):
+class RecordRunOutcomeRequest(_RunRequestModel):
     outcome: Literal["used", "edited", "rejected", "escalated", "not_sure"]
     finding_adjudications: list[FindingAdjudication] = Field(
         default_factory=lambda: list[FindingAdjudication](), max_length=20
@@ -573,6 +617,13 @@ class RecordRunOutcomeRequest(SDKBaseModel):
         if (self.outcome == "edited") != (self.edited_artifact_ref is not None):
             raise ValueError("edited outcome requires an edited_artifact_ref")
         return self
+
+
+    @model_validator(mode="wrap")
+    @classmethod
+    def _safe_outcome_validation(cls, value: Any, handler: Any) -> Any:
+        """Sanitize the complete outcome pipeline, including combination checks."""
+        return cls._validate_content_free(value, handler)
 
 
 class PublicTaskContractSummary(_RunResponseModel):

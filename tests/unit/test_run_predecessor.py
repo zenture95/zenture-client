@@ -8,6 +8,7 @@ from uuid import UUID
 
 import httpx
 import pytest
+from pydantic import ValidationError
 
 from zenture import AsyncZentureClient, ZentureClient
 from zenture._contract import PublicErrorCode
@@ -86,7 +87,7 @@ def test_malformed_predecessor_fails_locally_before_any_request(bad: str) -> Non
     bodies: list[dict[str, object]] = []
     client = _sync_client(bodies)
     try:
-        with pytest.raises(ValueError):
+        with pytest.raises(ValidationError):
             client.runs.create(proposal_id=PROPOSAL_ID, proposal_hash=PROPOSAL_HASH, idempotency_key="k",
                                predecessor_run_id=bad)
     finally:

@@ -8,6 +8,7 @@ from pydantic import ValidationError
 
 from zenture.models import ForwardCompatibleErrorEnvelope
 from zenture.redaction import redact_text
+from zenture.validation_issues import ValidationIssue, safe_issues
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
@@ -28,12 +29,14 @@ class ZentureAPIError(ZentureError):
         status_code: int,
         request_id: str | None = None,
         retry_after: float | None = None,
+        issues: tuple[ValidationIssue, ...] = (),
     ) -> None:
         self.message = redact_text(message)
         self.error_code = error_code
         self.status_code = status_code
         self.request_id = request_id
         self.retry_after = retry_after
+        self.issues = safe_issues(issues)
         super().__init__(self.message)
 
     def __str__(self) -> str:
@@ -114,7 +117,9 @@ class ZentureMCPError(ZentureError):
         request_id: str | None = None,
         retry_after_seconds: int | None = None,
         idempotency_key: str | None = None,
+        issues: tuple[ValidationIssue, ...] = (),
     ) -> None:
+        self.issues = safe_issues(issues, channel="mcp")
         self.code = code
         self.status_code = status_code
         self.retryable = retryable
@@ -243,6 +248,7 @@ def error_from_response(
         status_code=status_code,
         request_id=envelope.request_id,
         retry_after=retry_after,
+        issues=envelope.error.issues,
     )
 
 

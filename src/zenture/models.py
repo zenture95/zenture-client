@@ -2,7 +2,11 @@
 
 from __future__ import annotations
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, field_validator
+
+from zenture.validation_issues import ValidationConstraints as ValidationConstraints
+from zenture.validation_issues import ValidationIssue as ValidationIssue
+from zenture.validation_issues import safe_issues
 
 
 class SDKBaseModel(BaseModel):
@@ -16,6 +20,12 @@ class ForwardCompatibleError(SDKBaseModel):
 
     code: str
     message: str
+    issues: tuple[ValidationIssue, ...] = ()
+
+    @field_validator("issues", mode="before")
+    @classmethod
+    def _issues(cls, value: object) -> tuple[ValidationIssue, ...]:
+        return safe_issues(value)
 
 
 class ForwardCompatibleErrorEnvelope(SDKBaseModel):

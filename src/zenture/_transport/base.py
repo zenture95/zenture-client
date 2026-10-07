@@ -129,3 +129,15 @@ def _parse_retry_after(value: str) -> float | None:
         return None
     retry_at_timestamp = retry_at.timestamp()
     return max(0.0, retry_at_timestamp - time())
+
+
+def request_error_details(headers: dict[str, str], path: str) -> None:
+    """Opt scoped REST requests into safe details, preserving explicit overrides."""
+    normalized = path if path.startswith("/") else "/" + path
+    if not any(
+        normalized == prefix or normalized.startswith(prefix + "/")
+        for prefix in ("/runs", "/run-artifacts")
+    ):
+        return
+    if not any(key.lower() == "x-zenture-error-details" for key in headers):
+        headers["X-Zenture-Error-Details"] = "issues"

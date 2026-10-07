@@ -595,6 +595,7 @@
           },
           "profile": {
             "default": "standard",
+            "description": "Evaluation profile; omitted means standard. fast uses a shorter execution budget; detailed uses an extended budget and additional review steps. Guest Runs admit fast or standard only; detailed requires an account.",
             "enum": [
               "fast",
               "standard",
@@ -907,6 +908,10 @@
         "properties": {
           "code": {
             "$ref": "#/components/schemas/PublicErrorCode"
+          },
+          "issues": {
+            "$ref": "#/components/schemas/ValidationIssues",
+            "description": "Safe Run validation issues, included only for X-Zenture-Error-Details: issues and omitted when unavailable."
           },
           "message": {
             "type": "string"
@@ -1513,6 +1518,10 @@
         "properties": {
           "code": {
             "$ref": "#/components/schemas/PublicRunErrorCode"
+          },
+          "issues": {
+            "$ref": "#/components/schemas/ValidationIssues",
+            "description": "Safe validation issues requested with X-Zenture-Error-Details: issues; omitted when unavailable."
           },
           "message": {
             "maxLength": 512,
@@ -2822,8 +2831,98 @@
         ],
         "type": "object"
       },
+      "ValidationConstraints": {
+        "additionalProperties": false,
+        "minProperties": 1,
+        "properties": {
+          "allowed_values": {
+            "items": {
+              "maxLength": 128,
+              "type": "string"
+            },
+            "maxItems": 32,
+            "minItems": 1,
+            "title": "Allowed Values",
+            "type": "array"
+          },
+          "max_length": {
+            "minimum": 0,
+            "title": "Max Length",
+            "type": "integer"
+          },
+          "maximum": {
+            "title": "Maximum",
+            "type": "number"
+          },
+          "min_length": {
+            "minimum": 0,
+            "title": "Min Length",
+            "type": "integer"
+          },
+          "minimum": {
+            "title": "Minimum",
+            "type": "number"
+          },
+          "unit": {
+            "enum": [
+              "unicode_code_points",
+              "items",
+              "bytes",
+              "seconds"
+            ],
+            "title": "Unit",
+            "type": "string"
+          }
+        },
+        "title": "ValidationConstraints",
+        "type": "object"
+      },
+      "ValidationIssue": {
+        "additionalProperties": false,
+        "properties": {
+          "category": {
+            "enum": [
+              "required",
+              "invalid_type",
+              "invalid_enum",
+              "invalid_format",
+              "too_short",
+              "too_long",
+              "out_of_range",
+              "invalid_combination",
+              "unknown_field"
+            ],
+            "title": "Category",
+            "type": "string"
+          },
+          "constraints": {
+            "$ref": "#/components/schemas/ValidationConstraints"
+          },
+          "path": {
+            "maxLength": 256,
+            "pattern": "^(?:/(?:[^~/]|~[01])*)*$",
+            "title": "Path",
+            "type": "string"
+          }
+        },
+        "required": [
+          "path",
+          "category"
+        ],
+        "title": "ValidationIssue",
+        "type": "object"
+      },
+      "ValidationIssues": {
+        "items": {
+          "$ref": "#/components/schemas/ValidationIssue"
+        },
+        "maxItems": 20,
+        "minItems": 1,
+        "type": "array"
+      },
       "ZentureRefRunArtifact": {
         "additionalProperties": false,
+        "description": "Registered-file reference retained in the schema; currently rejected during Run preparation. Registration does not enable evaluation: textual references return artifact_unavailable; other media types return artifact_type_unsupported.",
         "properties": {
           "type": {
             "const": "zenture_ref"
@@ -6521,6 +6620,16 @@
         "operationId": "postV1RunArtifacts",
         "parameters": [
           {
+            "description": "Send issues to request safe field validation details in error.issues. Missing or unknown values retain the coarse error envelope. Success responses, authorization and idempotency are unchanged.",
+            "example": "issues",
+            "in": "header",
+            "name": "X-Zenture-Error-Details",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
             "description": "Required idempotency key for safe mutation retries. Use an ASCII-safe caller key such as [A-Za-z0-9._:-]+. Do not include prompts, answers, API tokens, PII, or raw request bodies.",
             "in": "header",
             "name": "Idempotency-Key",
@@ -6733,6 +6842,34 @@
           "422": {
             "content": {
               "application/json": {
+                "examples": {
+                  "coarse": {
+                    "summary": "Missing or unknown error-details header",
+                    "value": {
+                      "error": {
+                        "code": "validation_failed",
+                        "message": "The request is invalid."
+                      },
+                      "request_id": "req_00000000000000000000000000000000"
+                    }
+                  },
+                  "with_issues": {
+                    "summary": "X-Zenture-Error-Details: issues, when safe details exist",
+                    "value": {
+                      "error": {
+                        "code": "validation_failed",
+                        "issues": [
+                          {
+                            "category": "unknown_field",
+                            "path": ""
+                          }
+                        ],
+                        "message": "The request is invalid."
+                      },
+                      "request_id": "req_00000000000000000000000000000000"
+                    }
+                  }
+                },
                 "schema": {
                   "$ref": "#/components/schemas/PublicErrorEnvelope"
                 }
@@ -6908,6 +7045,16 @@
         "operationId": "postV1RunArtifactsSignedUpload",
         "parameters": [
           {
+            "description": "Send issues to request safe field validation details in error.issues. Missing or unknown values retain the coarse error envelope. Success responses, authorization and idempotency are unchanged.",
+            "example": "issues",
+            "in": "header",
+            "name": "X-Zenture-Error-Details",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
             "description": "Required idempotency key for safe mutation retries. Use an ASCII-safe caller key such as [A-Za-z0-9._:-]+. Do not include prompts, answers, API tokens, PII, or raw request bodies.",
             "in": "header",
             "name": "Idempotency-Key",
@@ -7043,6 +7190,34 @@
           "422": {
             "content": {
               "application/json": {
+                "examples": {
+                  "coarse": {
+                    "summary": "Missing or unknown error-details header",
+                    "value": {
+                      "error": {
+                        "code": "validation_failed",
+                        "message": "The request is invalid."
+                      },
+                      "request_id": "req_00000000000000000000000000000000"
+                    }
+                  },
+                  "with_issues": {
+                    "summary": "X-Zenture-Error-Details: issues, when safe details exist",
+                    "value": {
+                      "error": {
+                        "code": "validation_failed",
+                        "issues": [
+                          {
+                            "category": "unknown_field",
+                            "path": ""
+                          }
+                        ],
+                        "message": "The request is invalid."
+                      },
+                      "request_id": "req_00000000000000000000000000000000"
+                    }
+                  }
+                },
                 "schema": {
                   "$ref": "#/components/schemas/PublicErrorEnvelope"
                 }
@@ -7215,6 +7390,16 @@
       "get": {
         "operationId": "getV1Runs",
         "parameters": [
+          {
+            "description": "Send issues to request safe field validation details in error.issues. Missing or unknown values retain the coarse error envelope. Success responses, authorization and idempotency are unchanged.",
+            "example": "issues",
+            "in": "header",
+            "name": "X-Zenture-Error-Details",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
           {
             "description": "Comma-separated Run categories: active, completed, failed, cancelled. completed is canonical success; succeeded is a deprecated input alias for the same success category.",
             "in": "query",
@@ -7397,6 +7582,34 @@
           "422": {
             "content": {
               "application/json": {
+                "examples": {
+                  "coarse": {
+                    "summary": "Missing or unknown error-details header",
+                    "value": {
+                      "error": {
+                        "code": "validation_failed",
+                        "message": "The request is invalid."
+                      },
+                      "request_id": "req_00000000000000000000000000000000"
+                    }
+                  },
+                  "with_issues": {
+                    "summary": "X-Zenture-Error-Details: issues, when safe details exist",
+                    "value": {
+                      "error": {
+                        "code": "validation_failed",
+                        "issues": [
+                          {
+                            "category": "unknown_field",
+                            "path": ""
+                          }
+                        ],
+                        "message": "The request is invalid."
+                      },
+                      "request_id": "req_00000000000000000000000000000000"
+                    }
+                  }
+                },
                 "schema": {
                   "$ref": "#/components/schemas/PublicErrorEnvelope"
                 }
@@ -7567,6 +7780,16 @@
       "post": {
         "operationId": "postV1Runs",
         "parameters": [
+          {
+            "description": "Send issues to request safe field validation details in error.issues. Missing or unknown values retain the coarse error envelope. Success responses, authorization and idempotency are unchanged.",
+            "example": "issues",
+            "in": "header",
+            "name": "X-Zenture-Error-Details",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
           {
             "description": "Required idempotency key for safe mutation retries. Use an ASCII-safe caller key such as [A-Za-z0-9._:-]+. Do not include prompts, answers, API tokens, PII, or raw request bodies.",
             "in": "header",
@@ -7743,6 +7966,34 @@
           "422": {
             "content": {
               "application/json": {
+                "examples": {
+                  "coarse": {
+                    "summary": "Missing or unknown error-details header",
+                    "value": {
+                      "error": {
+                        "code": "validation_failed",
+                        "message": "The request is invalid."
+                      },
+                      "request_id": "req_00000000000000000000000000000000"
+                    }
+                  },
+                  "with_issues": {
+                    "summary": "X-Zenture-Error-Details: issues, when safe details exist",
+                    "value": {
+                      "error": {
+                        "code": "validation_failed",
+                        "issues": [
+                          {
+                            "category": "unknown_field",
+                            "path": ""
+                          }
+                        ],
+                        "message": "The request is invalid."
+                      },
+                      "request_id": "req_00000000000000000000000000000000"
+                    }
+                  }
+                },
                 "schema": {
                   "$ref": "#/components/schemas/PublicErrorEnvelope"
                 }
@@ -7916,6 +8167,16 @@
         "operationId": "postV1RunsPrepare",
         "parameters": [
           {
+            "description": "Send issues to request safe field validation details in error.issues. Missing or unknown values retain the coarse error envelope. Success responses, authorization and idempotency are unchanged.",
+            "example": "issues",
+            "in": "header",
+            "name": "X-Zenture-Error-Details",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
             "description": "Required idempotency key for safe mutation retries. Use an ASCII-safe caller key such as [A-Za-z0-9._:-]+. Do not include prompts, answers, API tokens, PII, or raw request bodies.",
             "in": "header",
             "name": "Idempotency-Key",
@@ -8061,6 +8322,34 @@
           "422": {
             "content": {
               "application/json": {
+                "examples": {
+                  "coarse": {
+                    "summary": "Missing or unknown error-details header",
+                    "value": {
+                      "error": {
+                        "code": "validation_failed",
+                        "message": "The request is invalid."
+                      },
+                      "request_id": "req_00000000000000000000000000000000"
+                    }
+                  },
+                  "with_issues": {
+                    "summary": "X-Zenture-Error-Details: issues, when safe details exist",
+                    "value": {
+                      "error": {
+                        "code": "validation_failed",
+                        "issues": [
+                          {
+                            "category": "unknown_field",
+                            "path": ""
+                          }
+                        ],
+                        "message": "The request is invalid."
+                      },
+                      "request_id": "req_00000000000000000000000000000000"
+                    }
+                  }
+                },
                 "schema": {
                   "$ref": "#/components/schemas/PublicErrorEnvelope"
                 }
@@ -8234,6 +8523,16 @@
         "operationId": "getV1Run",
         "parameters": [
           {
+            "description": "Send issues to request safe field validation details in error.issues. Missing or unknown values retain the coarse error envelope. Success responses, authorization and idempotency are unchanged.",
+            "example": "issues",
+            "in": "header",
+            "name": "X-Zenture-Error-Details",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
             "description": "Canonical public Run identifier.",
             "in": "path",
             "name": "run_id",
@@ -8371,6 +8670,34 @@
           "422": {
             "content": {
               "application/json": {
+                "examples": {
+                  "coarse": {
+                    "summary": "Missing or unknown error-details header",
+                    "value": {
+                      "error": {
+                        "code": "validation_failed",
+                        "message": "The request is invalid."
+                      },
+                      "request_id": "req_00000000000000000000000000000000"
+                    }
+                  },
+                  "with_issues": {
+                    "summary": "X-Zenture-Error-Details: issues, when safe details exist",
+                    "value": {
+                      "error": {
+                        "code": "validation_failed",
+                        "issues": [
+                          {
+                            "category": "unknown_field",
+                            "path": ""
+                          }
+                        ],
+                        "message": "The request is invalid."
+                      },
+                      "request_id": "req_00000000000000000000000000000000"
+                    }
+                  }
+                },
                 "schema": {
                   "$ref": "#/components/schemas/PublicErrorEnvelope"
                 }
@@ -8544,6 +8871,16 @@
         "operationId": "postV1RunCancel",
         "parameters": [
           {
+            "description": "Send issues to request safe field validation details in error.issues. Missing or unknown values retain the coarse error envelope. Success responses, authorization and idempotency are unchanged.",
+            "example": "issues",
+            "in": "header",
+            "name": "X-Zenture-Error-Details",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
             "description": "Required idempotency key for safe mutation retries. Use an ASCII-safe caller key such as [A-Za-z0-9._:-]+. Do not include prompts, answers, API tokens, PII, or raw request bodies.",
             "in": "header",
             "name": "Idempotency-Key",
@@ -8679,6 +9016,34 @@
           "422": {
             "content": {
               "application/json": {
+                "examples": {
+                  "coarse": {
+                    "summary": "Missing or unknown error-details header",
+                    "value": {
+                      "error": {
+                        "code": "validation_failed",
+                        "message": "The request is invalid."
+                      },
+                      "request_id": "req_00000000000000000000000000000000"
+                    }
+                  },
+                  "with_issues": {
+                    "summary": "X-Zenture-Error-Details: issues, when safe details exist",
+                    "value": {
+                      "error": {
+                        "code": "validation_failed",
+                        "issues": [
+                          {
+                            "category": "unknown_field",
+                            "path": ""
+                          }
+                        ],
+                        "message": "The request is invalid."
+                      },
+                      "request_id": "req_00000000000000000000000000000000"
+                    }
+                  }
+                },
                 "schema": {
                   "$ref": "#/components/schemas/PublicErrorEnvelope"
                 }
@@ -8852,6 +9217,16 @@
         "operationId": "getV1RunEvents",
         "parameters": [
           {
+            "description": "Send issues to request safe field validation details in error.issues. Missing or unknown values retain the coarse error envelope. Success responses, authorization and idempotency are unchanged.",
+            "example": "issues",
+            "in": "header",
+            "name": "X-Zenture-Error-Details",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
             "description": "Canonical public Run identifier.",
             "in": "path",
             "name": "run_id",
@@ -8997,6 +9372,34 @@
           "422": {
             "content": {
               "application/json": {
+                "examples": {
+                  "coarse": {
+                    "summary": "Missing or unknown error-details header",
+                    "value": {
+                      "error": {
+                        "code": "validation_failed",
+                        "message": "The request is invalid."
+                      },
+                      "request_id": "req_00000000000000000000000000000000"
+                    }
+                  },
+                  "with_issues": {
+                    "summary": "X-Zenture-Error-Details: issues, when safe details exist",
+                    "value": {
+                      "error": {
+                        "code": "validation_failed",
+                        "issues": [
+                          {
+                            "category": "unknown_field",
+                            "path": ""
+                          }
+                        ],
+                        "message": "The request is invalid."
+                      },
+                      "request_id": "req_00000000000000000000000000000000"
+                    }
+                  }
+                },
                 "schema": {
                   "$ref": "#/components/schemas/PublicErrorEnvelope"
                 }
@@ -9170,6 +9573,16 @@
         "operationId": "getV1RunEventsStream",
         "parameters": [
           {
+            "description": "Send issues to request safe field validation details in error.issues. Missing or unknown values retain the coarse error envelope. Success responses, authorization and idempotency are unchanged.",
+            "example": "issues",
+            "in": "header",
+            "name": "X-Zenture-Error-Details",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
             "description": "Canonical public Run identifier.",
             "in": "path",
             "name": "run_id",
@@ -9303,6 +9716,34 @@
           "422": {
             "content": {
               "application/json": {
+                "examples": {
+                  "coarse": {
+                    "summary": "Missing or unknown error-details header",
+                    "value": {
+                      "error": {
+                        "code": "validation_failed",
+                        "message": "The request is invalid."
+                      },
+                      "request_id": "req_00000000000000000000000000000000"
+                    }
+                  },
+                  "with_issues": {
+                    "summary": "X-Zenture-Error-Details: issues, when safe details exist",
+                    "value": {
+                      "error": {
+                        "code": "validation_failed",
+                        "issues": [
+                          {
+                            "category": "unknown_field",
+                            "path": ""
+                          }
+                        ],
+                        "message": "The request is invalid."
+                      },
+                      "request_id": "req_00000000000000000000000000000000"
+                    }
+                  }
+                },
                 "schema": {
                   "$ref": "#/components/schemas/PublicErrorEnvelope"
                 }
@@ -9476,6 +9917,16 @@
         "operationId": "postV1RunOutcome",
         "parameters": [
           {
+            "description": "Send issues to request safe field validation details in error.issues. Missing or unknown values retain the coarse error envelope. Success responses, authorization and idempotency are unchanged.",
+            "example": "issues",
+            "in": "header",
+            "name": "X-Zenture-Error-Details",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
             "description": "Required idempotency key for safe mutation retries. Use an ASCII-safe caller key such as [A-Za-z0-9._:-]+. Do not include prompts, answers, API tokens, PII, or raw request bodies.",
             "in": "header",
             "name": "Idempotency-Key",
@@ -9611,6 +10062,34 @@
           "422": {
             "content": {
               "application/json": {
+                "examples": {
+                  "coarse": {
+                    "summary": "Missing or unknown error-details header",
+                    "value": {
+                      "error": {
+                        "code": "validation_failed",
+                        "message": "The request is invalid."
+                      },
+                      "request_id": "req_00000000000000000000000000000000"
+                    }
+                  },
+                  "with_issues": {
+                    "summary": "X-Zenture-Error-Details: issues, when safe details exist",
+                    "value": {
+                      "error": {
+                        "code": "validation_failed",
+                        "issues": [
+                          {
+                            "category": "unknown_field",
+                            "path": ""
+                          }
+                        ],
+                        "message": "The request is invalid."
+                      },
+                      "request_id": "req_00000000000000000000000000000000"
+                    }
+                  }
+                },
                 "schema": {
                   "$ref": "#/components/schemas/PublicErrorEnvelope"
                 }

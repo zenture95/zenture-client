@@ -101,11 +101,23 @@ class _OfficialAsyncMcpTransport:
     def __init__(self, session: Any) -> None:
         self._session = session
 
-    async def list_tools(self) -> object:
-        return await self._session.list_tools()
+    async def list_tools(self, *, cursor: str | None = None) -> object:
+        if cursor is None:
+            return await self._session.list_tools()
+        params_type = importlib.import_module("mcp.types").PaginatedRequestParams
+        return await self._session.list_tools(params=params_type(cursor=cursor))
 
-    async def call_tool(self, name: str, arguments: Mapping[str, object]) -> object:
-        return await self._session.call_tool(name, arguments=dict(arguments))
+    async def call_tool(
+        self,
+        name: str,
+        arguments: Mapping[str, object],
+        *,
+        read_timeout_seconds: float | None = None,
+    ) -> object:
+        options: dict[str, object] = {}
+        if read_timeout_seconds is not None:
+            options["read_timeout_seconds"] = read_timeout_seconds
+        return await self._session.call_tool(name, arguments=dict(arguments), **options)
 
 
 @asynccontextmanager

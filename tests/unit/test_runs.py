@@ -1390,6 +1390,7 @@ def test_sync_wait_returns_when_queued_run_reaches_completed() -> None:
 
     def handler(request: httpx.Request) -> httpx.Response:
         assert request.url.path == f"/v1/runs/{RUN_ID}"
+        assert request.headers["X-Zenture-Error-Details"] == "issues"
         seen.append(request)
         return httpx.Response(200, json=responses[min(len(responses) - 1, len(seen) - 1)])
 
@@ -1937,6 +1938,7 @@ async def test_async_wait_returns_when_queued_run_reaches_completed() -> None:
 
     async def handler(request: httpx.Request) -> httpx.Response:
         assert request.url.path == f"/v1/runs/{RUN_ID}"
+        assert request.headers["X-Zenture-Error-Details"] == "issues"
         seen.append(request)
         return httpx.Response(200, json=responses[min(len(responses) - 1, len(seen) - 1)])
 
@@ -2152,6 +2154,7 @@ def test_sync_signed_upload_omits_optional_upload_id() -> None:
 
     def handler(request: httpx.Request) -> httpx.Response:
         assert request.url.path == "/v1/run-artifacts/signed-upload"
+        assert request.headers["X-Zenture-Error-Details"] == "issues"
         assert "upload_id" not in request.content.decode()
         return httpx.Response(
             200,
@@ -2184,6 +2187,7 @@ async def test_async_signed_upload_omits_optional_upload_id() -> None:
 
     async def handler(request: httpx.Request) -> httpx.Response:
         assert request.url.path == "/v1/run-artifacts/signed-upload"
+        assert request.headers["X-Zenture-Error-Details"] == "issues"
         assert "upload_id" not in request.content.decode()
         return httpx.Response(
             200,

@@ -5,13 +5,14 @@ from __future__ import annotations
 import re
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING, Any, Literal
 from urllib.parse import urlsplit, urlunsplit
 
 from pydantic import Field, field_validator, model_validator
 
 from zenture._contract import PublicRunResponse
 from zenture._contract.run_references import validate_run_cursor
+from zenture._request_validation import SafeRunRequestModel
 from zenture.models import SDKBaseModel
 
 if TYPE_CHECKING:
@@ -91,7 +92,7 @@ def _normalize_endpoint(value: object) -> str:
     return urlunsplit((parsed.scheme, parsed.netloc, "/", "", ""))
 
 
-class McpArtifactRequest(SDKBaseModel):
+class McpArtifactRequest(SafeRunRequestModel):
     """Metadata passed to the MCP artifact tool; bytes stay out of JSON."""
 
     file_name: str = Field(min_length=1, max_length=255)
@@ -110,7 +111,7 @@ class McpArtifactRequest(SDKBaseModel):
         return normalized
 
 
-class McpListRunsRequest(SDKBaseModel):
+class McpListRunsRequest(SafeRunRequestModel):
     """Bounded list filters matching the MCP tool input contract."""
 
     status: tuple[str, ...] = ()
@@ -136,7 +137,15 @@ class McpListRunsRequest(SDKBaseModel):
         return validate_run_cursor(value)
 
 
-class McpGetRunRequest(SDKBaseModel):
+class McpParameterSchema(SDKBaseModel):
+    """Registered argument facts for sanitation; does not validate local requests."""
+
+    replay_cursor: str = Field(min_length=1, max_length=512)
+    created_after: str = Field(min_length=1, json_schema_extra={"format": "date-time"})
+    created_before: str = Field(min_length=1, json_schema_extra={"format": "date-time"})
+
+
+class McpGetRunRequest(SafeRunRequestModel):
     """Typed get/replay arguments for the MCP client."""
 
     run_id: str
@@ -160,14 +169,14 @@ class McpGetRunRequest(SDKBaseModel):
         return validate_run_cursor(value, field="replay_cursor")
 
 
-class McpFindingAdjudication(SDKBaseModel):
+class McpFindingAdjudication(SafeRunRequestModel):
     """Bounded typed finding feedback carried by the MCP outcome tool."""
 
     finding_ref: str = Field(min_length=1, max_length=128)
     outcome: Literal["confirmed", "rejected", "partially_valid", "not_sure"]
 
 
-class McpOutcomeRequest(SDKBaseModel):
+class McpOutcomeRequest(SafeRunRequestModel):
     """MCP outcome input mapped to the canonical outcome authority."""
 
     run_id: str
@@ -194,6 +203,12 @@ class McpOutcomeRequest(SDKBaseModel):
         if (self.outcome == "edited") != (self.edited_artifact_ref is not None):
             raise ValueError("edited outcome requires edited_artifact_ref")
         return self
+
+    @model_validator(mode="wrap")
+    @classmethod
+    def _safe_outcome_validation(cls, value: Any, handler: Any) -> Any:
+        """Sanitize the complete outcome pipeline, including combination checks."""
+        return cls._validate_content_free(value, handler)
 
 
 def validate_run_idempotency_key(value: object) -> str:

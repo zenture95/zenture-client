@@ -136,3 +136,74 @@ server authority; an expired prepared-only Run is not made admissible. A changed
 request under the same key can conflict. Never use a replacement key as a fallback
 after an uncertain outcome. See [idempotency](./idempotency.md) for the distinct
 REST client contract.
+
+## Complete tool discovery
+
+`client.get_tool_catalog()` returns a tuple of SDK-owned `McpToolDefinition`
+objects. Await the method on `AsyncMcpClient`. Import the definition type from
+`zenture.mcp`; callers need no imports from the MCP transport package.
+
+```python
+from zenture.mcp import McpClient, McpToolDefinition
+
+with McpClient.connect() as client:
+    catalog: tuple[McpToolDefinition, ...] = client.get_tool_catalog()
+    run_tool = next(tool for tool in catalog if tool.name == "run")
+    task_schema = run_tool.input_schema["properties"]["task"]
+```
+
+Each definition preserves the registered `name`, `title`, `description`,
+`input_schema`, `output_schema`, and `annotations`, including schema constraints,
+references and annotation extensions. Optional metadata is `None` when absent.
+Schemas and annotations are detached JSON objects; changing them does not change
+transport data. Definitions reflect the current server registration: discover
+`attach_artifact` by membership instead of assuming availability. Annotation
+hints describe tools and do not grant authorization.
+
+Discovery makes no product-tool calls and has no result cache. It follows
+pagination through the official initialized MCP transport, with limits of 128
+tools, 128 pages and 256 KiB of catalog JSON. Invalid metadata, duplicate names,
+repeated cursors, exceeded limits, and unsupported continuation raise
+`ZentureMCPProtocolError` without returning a partial catalog. Transport failures
+use `ZentureMCPError`.
+
+Custom transports can support continuation with
+`list_tools(*, cursor: str | None = None)`. An older no-argument transport still
+works for a complete single page; returning a cursor without support raises an
+explicit protocol error. `list_tools()` retains its existing tuple of names and
+accepts older name-only catalogs.
+
+### Waiting for one Run
+
+Both peers provide `wait_run(run_id, timeout, *, stop_on=())`. Supply a finite,
+positive timeout in seconds on an already connected client:
+
+```python
+read = client.wait_run(run_id, 60, stop_on=("waiting_for_dependency",))
+# Async peer: read = await client.wait_run(run_id, 60)
+print(read.run.status)
+```
+
+The helper reads the same Run with summary view only. It returns `McpRunRead`
+for completed, historical succeeded, failed, cancelled, expired, and
+budget_exhausted states, plus any existing statuses supplied in `stop_on`.
+Unknown statuses are rejected before I/O. Technical completion still differs
+from acceptance. Read full content explicitly with `get_run` when needed.
+
+Polling starts at one second and doubles up to eight seconds. Only retryable
+read failures are retried; `retry_after_seconds` is a minimum delay. When that
+delay cannot fit, waiting expires locally without an early retry. Permanent
+errors propagate. Waiting never starts, cancels, or records an outcome for a Run.
+Async task cancellation stops local observation and propagates to the caller.
+
+`ZenturePollingTimeoutError` from `zenture.errors` retains the Run ID in
+`operation_id`, the last observed status in `last_status`, and the last safe
+error request ID in `last_request_id`. Keep the ID to resume observation later.
+A terminal read arriving after the deadline still raises this timeout.
+
+The official MCP transport and sync portal forward the remaining read budget
+per call. Custom transports may add a keyword `read_timeout_seconds` accepting
+numeric seconds. Existing two-argument `call_tool(name, arguments)` transports
+continue to work: their dispatches and sleeps respect the deadline, but an
+in-flight read can overrun it. The late response still produces a local timeout.
+An internal `TypeError` is surfaced without redispatching that read.

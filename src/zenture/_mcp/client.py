@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 import json
 import re
-from collections.abc import AsyncGenerator, Generator, Iterable, Mapping, Sequence
+from collections.abc import AsyncGenerator, Awaitable, Generator, Iterable, Mapping, Sequence
 from contextlib import asynccontextmanager, contextmanager
 from typing import TYPE_CHECKING, Any, Literal, TypeVar, cast
 from uuid import uuid4
@@ -21,6 +21,7 @@ from zenture._contract import (
     RunArtifact,
     RunProfile,
 )
+from zenture._mcp.catalog import CatalogSnapshot, McpToolDefinition, continuation
 from zenture._mcp.contracts import (
     McpArtifactRequest,
     McpEndpoint,
@@ -38,7 +39,9 @@ from zenture._mcp.transport import (
     SyncMcpTransport,
     open_streamable_http_transport,
 )
+from zenture._mcp.wait import supports_timeout, timed_call, wait_async, wait_sync
 from zenture.errors import ZentureMCPError, ZentureMCPProtocolError
+from zenture.validation_issues import safe_issues
 
 if TYPE_CHECKING:
     from zenture._auth.session import AuthSession
@@ -93,6 +96,14 @@ def _validate_safe_payload(value: object) -> dict[str, object]:
     if mapping is None:
         raise ZentureMCPProtocolError("invalid_result")
     _bounded_json(mapping, label="result", limit=_MAX_RESULT_BYTES)
+    # Bound the complete original payload before replacing untrusted optional data.
+    raw_error = _mapping(mapping.get("error"))
+    if raw_error is not None and "issues" in raw_error:
+        error = dict(raw_error)
+        issues = safe_issues(error.pop("issues"), channel="mcp")
+        if issues:
+            error["issues"] = [item.model_dump(mode="json", exclude_none=True) for item in issues]
+        mapping = {**mapping, "error": error}
 
     def walk(node: object) -> None:
         node_mapping = _mapping(node)
@@ -180,6 +191,7 @@ def _error_from_payload(payload: Mapping[str, object]) -> ZentureMCPError:
         next_action=next_action,
         request_id=request_id,
         retry_after_seconds=retry_after,
+        issues=safe_issues(raw.get("issues"), channel="mcp"),
     )
 
 
@@ -233,7 +245,7 @@ def _run_request(*, task: str, artifact: dict[str, Any], profile: str) -> dict[s
     request = PrepareKnowledgeRunRequest(
         task=task,
         artifact=cast("RunArtifact", artifact),
-        profile=RunProfile(profile),
+        profile=cast("RunProfile", profile),
     )
     return cast("dict[str, object]", request.model_dump(mode="json"))
 
@@ -287,12 +299,28 @@ class _PortalTransport:
     def __init__(self, portal: Any, transport: AsyncMcpTransport) -> None:
         self._portal = portal
         self._transport = transport
+        self._timed = supports_timeout(transport.call_tool)
 
-    def list_tools(self) -> object:
-        return self._portal.call(self._transport.list_tools)
+    def list_tools(self, *, cursor: str | None = None) -> object:
+        if cursor is None:
+            return self._portal.call(self._transport.list_tools)
+        return self._portal.call(continuation, self._transport.list_tools, cursor)
 
-    def call_tool(self, name: str, arguments: Mapping[str, object]) -> object:
-        return self._portal.call(self._transport.call_tool, name, arguments)
+    def call_tool(
+        self,
+        name: str,
+        arguments: Mapping[str, object],
+        *,
+        read_timeout_seconds: float | None = None,
+    ) -> object:
+        return self._portal.call(
+            timed_call,
+            self._transport.call_tool,
+            name,
+            arguments,
+            read_timeout_seconds,
+            self._timed,
+        )
 
 
 def _reject_running_event_loop() -> None:
@@ -311,6 +339,7 @@ class McpClient:
 
     def __init__(self, transport: SyncMcpTransport) -> None:
         self._transport = transport
+        self._timed = supports_timeout(transport.call_tool)
 
     @classmethod
     @contextmanager
@@ -346,6 +375,29 @@ class McpClient:
             if failure is not None:
                 raise failure
 
+    def get_tool_catalog(self) -> tuple[McpToolDefinition, ...]:
+        """Return complete registered metadata as a detached snapshot.
+
+        Follow cursor-capable transports with bounded pagination. Incomplete or
+        malformed catalogs raise a safe ZentureMCPProtocolError.
+        """
+
+        try:
+            snapshot = CatalogSnapshot()
+            page = self._transport.list_tools()
+            while (cursor := snapshot.add_page(page)) is not None:
+                page = continuation(self._transport.list_tools, cursor)
+            return tuple(snapshot.definitions)
+        except ZentureMCPError:
+            raise
+        except Exception as exc:
+            raise ZentureMCPError(
+                "mcp_transport_unavailable",
+                status_code=503,
+                retryable=True,
+                next_action="retry_later",
+            ) from exc
+
     def list_tools(self) -> tuple[str, ...]:
         """Return advertised tool names as a tuple, without calling a product tool.
 
@@ -378,17 +430,25 @@ class McpClient:
         if not _REQUIRED_PRODUCT_TOOL_NAMES.issubset(names):
             raise ZentureMCPProtocolError("tool_catalog_incomplete")
 
-    def _call(self, name: str, arguments: Mapping[str, object]) -> dict[str, object]:
+    def _call(
+        self,
+        name: str,
+        arguments: Mapping[str, object],
+        *,
+        read_timeout_seconds: float | None = None,
+    ) -> dict[str, object]:
         validated = _validate_arguments(arguments)
         try:
-            result = self._transport.call_tool(name, validated)
+            result = timed_call(
+                self._transport.call_tool, name, validated, read_timeout_seconds, self._timed
+            )
         except ZentureMCPError:
             raise
         except Exception as exc:
             raise ZentureMCPError(
                 "mcp_transport_unavailable",
                 status_code=503,
-                retryable=True,
+                retryable=not (read_timeout_seconds is not None and isinstance(exc, TypeError)),
                 next_action="retry_later",
             ) from exc
         return _decode_tool_result(
@@ -524,6 +584,23 @@ class McpClient:
             ),
         )
 
+    def wait_run(self, run_id: str, timeout: float, *, stop_on: Sequence[str] = ()) -> McpRunRead:
+        """Observe one Run with summary reads within a finite positive timeout.
+
+        Terminal states always return, including failure and expiry. stop_on adds
+        existing intermediate states. Timeout raises ZenturePollingTimeoutError
+        with operation_id set to the Run ID. This performs no lifecycle mutation.
+        Legacy untimed transports may overrun during an in-flight read.
+        """
+
+        def read(arguments: Mapping[str, object], remaining: float) -> McpRunRead:
+            return _read_result(
+                self._call("get_run", arguments, read_timeout_seconds=remaining),
+                expected_run_id=run_id,
+            )
+
+        return wait_sync(run_id, timeout, stop_on, read)
+
     def get_run(
         self,
         run_id: str,
@@ -654,6 +731,7 @@ class AsyncMcpClient:
 
     def __init__(self, transport: AsyncMcpTransport) -> None:
         self._transport = transport
+        self._timed = supports_timeout(transport.call_tool)
 
     @classmethod
     @asynccontextmanager
@@ -699,6 +777,31 @@ class AsyncMcpClient:
             if owned is not None:
                 owned.close()
 
+    async def get_tool_catalog(self) -> tuple[McpToolDefinition, ...]:
+        """Return complete registered metadata as a detached snapshot.
+
+        Follow cursor-capable transports with bounded pagination. Incomplete or
+        malformed catalogs raise a safe ZentureMCPProtocolError.
+        """
+
+        try:
+            snapshot = CatalogSnapshot()
+            page = await self._transport.list_tools()
+            while (cursor := snapshot.add_page(page)) is not None:
+                page = await cast(
+                    "Awaitable[object]", continuation(self._transport.list_tools, cursor)
+                )
+            return tuple(snapshot.definitions)
+        except ZentureMCPError:
+            raise
+        except Exception as exc:
+            raise ZentureMCPError(
+                "mcp_transport_unavailable",
+                status_code=503,
+                retryable=True,
+                next_action="retry_later",
+            ) from exc
+
     async def list_tools(self) -> tuple[str, ...]:
         """Return advertised tool names as a tuple, without calling a product tool.
 
@@ -735,17 +838,25 @@ class AsyncMcpClient:
         if not _REQUIRED_PRODUCT_TOOL_NAMES.issubset(names):
             raise ZentureMCPProtocolError("tool_catalog_incomplete")
 
-    async def _call(self, name: str, arguments: Mapping[str, object]) -> dict[str, object]:
+    async def _call(
+        self,
+        name: str,
+        arguments: Mapping[str, object],
+        *,
+        read_timeout_seconds: float | None = None,
+    ) -> dict[str, object]:
         validated = _validate_arguments(arguments)
         try:
-            result = await self._transport.call_tool(name, validated)
+            result = await timed_call(
+                self._transport.call_tool, name, validated, read_timeout_seconds, self._timed
+            )
         except ZentureMCPError:
             raise
         except Exception as exc:
             raise ZentureMCPError(
                 "mcp_transport_unavailable",
                 status_code=503,
-                retryable=True,
+                retryable=not (read_timeout_seconds is not None and isinstance(exc, TypeError)),
                 next_action="retry_later",
             ) from exc
         return _decode_tool_result(
@@ -887,6 +998,23 @@ class AsyncMcpClient:
                 ),
             ),
         )
+
+    async def wait_run(
+        self, run_id: str, timeout: float, *, stop_on: Sequence[str] = ()
+    ) -> McpRunRead:
+        """Observe one Run as wait_run does on McpClient; cancellation is local.
+
+        Await this method. Cancellation propagates without cancelling the Run.
+        Timeout retains the Run ID in ZenturePollingTimeoutError.operation_id.
+        """
+
+        async def read(arguments: Mapping[str, object], remaining: float) -> McpRunRead:
+            return _read_result(
+                await self._call("get_run", arguments, read_timeout_seconds=remaining),
+                expected_run_id=run_id,
+            )
+
+        return await wait_async(run_id, timeout, stop_on, read)
 
     async def get_run(
         self,

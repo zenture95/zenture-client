@@ -44,10 +44,16 @@ def _stored_environment(
     return store
 
 
-def test_public_module_exposes_exactly_the_two_peers() -> None:
-    assert sorted(zenture.mcp.__all__) == ["AsyncMcpClient", "McpClient"]
+def test_public_module_exposes_peers_and_sdk_catalog_type() -> None:
+    assert sorted(zenture.mcp.__all__) == ["AsyncMcpClient", "McpClient", "McpToolDefinition"]
     tool_methods = {"run", "attach_artifact", "list_runs", "get_run", "cancel_run"}
-    tool_methods |= {"record_run_outcome", "replay_events", "list_tools", "require_product_tools"}
+    tool_methods |= {
+        "record_run_outcome",
+        "replay_events",
+        "list_tools",
+        "get_tool_catalog",
+        "require_product_tools",
+    }
     for name in tool_methods:
         sync_parameters = inspect.signature(getattr(McpClient, name)).parameters
         async_parameters = inspect.signature(getattr(AsyncMcpClient, name)).parameters

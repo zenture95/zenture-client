@@ -877,21 +877,21 @@ def test_mcp_endpoint_rejects_unsafe_url_shapes(endpoint: str, message: str) -> 
         (
             "artifact",
             {"file_name": "a", "mime_type": "text/plain", "byte_size": 1, "content_hash": "bad"},
-            "lowercase SHA",
+            "content_hash",
         ),
         (
             "artifact",
             {"file_name": "a", "mime_type": "text/plain", "byte_size": 1, "content_hash": None},
-            "lowercase SHA",
+            "content_hash",
         ),
-        ("list", {"status": tuple("x" for _ in range(9))}, "eight short values"),
-        ("list", {"cursor": "cursor+plus"}, "cursor is invalid"),
-        ("get", {"run_id": RUN_ID, "replay_cursor": "cursor\nheader"}, "replay_cursor is invalid"),
-        ("outcome", {"run_id": "bad", "outcome": "used"}, "run_id is invalid"),
+        ("list", {"status": tuple("x" for _ in range(9))}, "status"),
+        ("list", {"cursor": "cursor+plus"}, "cursor"),
+        ("get", {"run_id": RUN_ID, "replay_cursor": "cursor\nheader"}, "replay_cursor"),
+        ("outcome", {"run_id": "bad", "outcome": "used"}, "run_id"),
         (
             "outcome",
             {"run_id": RUN_ID, "outcome": "used", "edited_artifact_ref": ARTIFACT_REF},
-            "edited outcome requires",
+            "Invalid request field",
         ),
         (
             "outcome",
@@ -937,11 +937,11 @@ def test_sync_mcp_cursor_inputs_fail_with_stable_contract_errors(cursor: object)
     transport = RecordingTransport(_responses())
     client = McpClient(transport)
 
-    with pytest.raises(ValueError, match="cursor is invalid"):
+    with pytest.raises(ValueError, match="cursor"):
         client.list_runs(cursor=cast("Any", cursor))
-    with pytest.raises(ValueError, match="replay_cursor is invalid"):
+    with pytest.raises(ValueError, match="replay_cursor"):
         client.get_run(RUN_ID, replay_cursor=cast("Any", cursor))
-    with pytest.raises(ValueError, match="replay_cursor is invalid"):
+    with pytest.raises(ValueError, match="replay_cursor"):
         client.replay_events(RUN_ID, cursor=cast("Any", cursor))
 
     assert transport.calls == []
@@ -965,11 +965,11 @@ async def test_async_mcp_cursor_inputs_fail_with_stable_contract_errors(cursor: 
     transport = AsyncRecordingTransport(_responses())
     client = AsyncMcpClient(transport)
 
-    with pytest.raises(ValueError, match="cursor is invalid"):
+    with pytest.raises(ValueError, match="cursor"):
         await client.list_runs(cursor=cast("Any", cursor))
-    with pytest.raises(ValueError, match="replay_cursor is invalid"):
+    with pytest.raises(ValueError, match="replay_cursor"):
         await client.get_run(RUN_ID, replay_cursor=cast("Any", cursor))
-    with pytest.raises(ValueError, match="replay_cursor is invalid"):
+    with pytest.raises(ValueError, match="replay_cursor"):
         await client.replay_events(RUN_ID, cursor=cast("Any", cursor))
 
     assert transport.calls == []
@@ -989,12 +989,13 @@ def test_sync_mcp_arguments_reject_invalid_run_and_unbounded_inputs() -> None:
     transport = RecordingTransport({"get_run": _run()})
     client = McpClient(transport)
 
-    with pytest.raises(ValueError, match="run_id is invalid"):
+    with pytest.raises(ValueError, match="run_id"):
         client.get_run("not-a-run")
-    with pytest.raises(ValueError, match="greater than or equal"):
+    with pytest.raises(ValueError, match="limit"):
         client.list_runs(limit=0)
-    with pytest.raises(ValueError, match="blank"):
+    with pytest.raises(ValueError, match="task"):
         client.run(task=" ", artifact={"type": "text", "value": "text"})
+    assert transport.calls == []
 
 
 def test_mcp_run_input_uses_gateway_text_and_reference_bounds() -> None:
@@ -1008,7 +1009,7 @@ def test_mcp_run_input_uses_gateway_text_and_reference_bounds() -> None:
         PrepareKnowledgeRunRequest.model_validate(
             {"task": "x", "artifact": {"type": "text", "value": "x" * 50_001}}
         )
-    with pytest.raises(ValueError, match="selected text"):
+    with pytest.raises(ValueError, match="artifact"):
         PrepareKnowledgeRunRequest.model_validate(
             {"task": "x", "artifact": {"type": "text", "value": "data:text/plain,x"}}
         )

@@ -90,3 +90,30 @@ proves identity, not completion or billing. `ZenturePollingTimeoutError` and
 `ZenturePollingStoppedError` from REST Run waiting keep run_id in `operation_id`;
 read that Run later. Neither stops server execution. The sample MCP polling
 workflow follows the same rule.
+
+## Validation field details
+
+`ZentureAPIError` and `ZentureMCPError` expose an immutable `issues` tuple.
+Each `zenture.validation_issues.ValidationIssue` contains a public JSON Pointer
+`path`, a stable `category`, and optional `ValidationConstraints` with static
+schema facts such as a length limit or the allowed enum values. Unknown field
+names are coarsened to a known parent; submitted values and validator context
+are excluded. Ordinary exception `str` and `repr` do not append these details.
+
+For example, an MCP validation error may provide `/profile` with category
+`invalid_enum` and allowed values `fast`, `standard`, and `detailed`. Use that
+information to correct the original request, preserving its recovery key.
+The tuple is empty when the producer supplies no details or when optional
+details fail structural or public-schema checks. The existing error code,
+status and retry policy remain the primary failure contract.
+
+The sync and async REST SDK automatically send `X-Zenture-Error-Details: issues`
+for Run and artifact requests, including event streams. Direct HTTP callers can
+send the same header to request safe details. Gateway includes `error.issues`
+only for the recognized value when safe details exist; missing or unknown values
+retain the coarse error body for older readers. Older servers can omit details.
+Auth and unrelated endpoints do not receive this header. Existing generic
+transport header overrides remain available, including a deliberate override of
+this header; ordinary caller headers preserve automatic negotiation.
+Local Run request models retain Pydantic `ValidationError`, with input values,
+unknown field names and validator context removed from exposed failures.

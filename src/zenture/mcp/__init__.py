@@ -7,6 +7,7 @@ credential store.
 
 from __future__ import annotations
 
+from zenture._mcp.catalog import McpToolDefinition
 from zenture._mcp.client import AsyncMcpClient, McpClient
 
-__all__ = ["AsyncMcpClient", "McpClient"]
+__all__ = ["AsyncMcpClient", "McpClient", "McpToolDefinition"]

@@ -42,7 +42,7 @@ Run in `.run`, while REST `runs.get()` returns it directly.
 | `POST` | `/v1/run-artifacts` | `201` | `client.runs.attach_artifact(...)` | `PublicRunArtifactResponse` |
 | `POST` | `/v1/run-artifacts/signed-upload` | `200` | `client.runs.signed_upload(...)` | `PublicSignedUploadResponse` |
 | `GET` | `/v1/runs` | `200` | `client.runs.list(...)` | `PublicRunCollectionResponse` |
-| `POST` | `/v1/runs` | `200, 202` | `client.runs.create(...) / client.runs.run(...)` | `PublicRunResponse` |
+| `POST` | `/v1/runs` | `200, 202` | `client.runs.create(...)`, `client.runs.run(...)` | `PublicRunResponse` |
 | `POST` | `/v1/runs/prepare` | `200` | `client.runs.prepare(...)` | `PrepareRunResponse` |
 | `GET` | `/v1/runs/{run_id}` | `200` | `client.runs.get(...)` | `PublicRunResponse` |
 | `POST` | `/v1/runs/{run_id}/cancel` | `200` | `client.runs.cancel(...)` | `PublicRunResponse` |
@@ -587,7 +587,7 @@ Schema: `PublicOperationResponse`
 
 ### `POST /v1/run-artifacts`
 
-SDK surface: `httpx` direct call
+SDK surface: `client.runs.attach_artifact(...)`
 
 SDK model: `PublicRunArtifactResponse`
 
@@ -620,7 +620,7 @@ Schema: `PublicRunArtifactResponse`
 
 ### `POST /v1/run-artifacts/signed-upload`
 
-SDK surface: `httpx` direct call
+SDK surface: `client.runs.signed_upload(...)`
 
 SDK model: `PublicSignedUploadResponse`
 
@@ -657,7 +657,7 @@ Schema: `PublicSignedUploadResponse`
 
 ### `GET /v1/runs`
 
-SDK surface: `httpx` direct call
+SDK surface: `client.runs.list(...)`
 
 SDK model: `PublicRunCollectionResponse`
 
@@ -694,7 +694,7 @@ Schema: `PublicRunCollectionResponse`
 
 ### `POST /v1/runs`
 
-SDK surface: `httpx` direct call
+SDK surface: `client.runs.create(...)`, `client.runs.run(...)`
 
 SDK model: `PublicRunResponse`
 
@@ -844,7 +844,7 @@ Schema: `PublicRunResponse`
 
 ### `POST /v1/runs/prepare`
 
-SDK surface: `httpx` direct call
+SDK surface: `client.runs.prepare(...)`
 
 SDK model: `PrepareRunResponse`
 
@@ -906,7 +906,7 @@ Schema: `PrepareRunResponse`
 
 ### `GET /v1/runs/{run_id}`
 
-SDK surface: `httpx` direct call
+SDK surface: `client.runs.get(...)`
 
 SDK model: `PublicRunResponse`
 
@@ -983,7 +983,7 @@ Schema: `PublicRunResponse`
 
 ### `POST /v1/runs/{run_id}/cancel`
 
-SDK surface: `httpx` direct call
+SDK surface: `client.runs.cancel(...)`
 
 SDK model: `PublicRunResponse`
 
@@ -1068,7 +1068,7 @@ Schema: `PublicRunResponse`
 
 ### `GET /v1/runs/{run_id}/events`
 
-SDK surface: `httpx` direct call
+SDK surface: `client.runs.list_events(...)`
 
 SDK model: `PublicRunEventsResponse`
 
@@ -1117,7 +1117,7 @@ Schema: `PublicRunEventsResponse`
 
 ### `GET /v1/runs/{run_id}/events/stream`
 
-SDK surface: `httpx` direct call
+SDK surface: `client.runs.iter_events(...)`
 
 SDK model: `string`
 
@@ -1139,7 +1139,7 @@ example
 
 ### `POST /v1/runs/{run_id}/outcome`
 
-SDK surface: `httpx` direct call
+SDK surface: `client.runs.record_outcome(...)`
 
 SDK model: `PublicRunOutcomeResponse`
 
@@ -1295,6 +1295,28 @@ Failed HTTP responses use a public error envelope:
     "message": "The request did not match the public API contract."
   },
   "request_id": "req_example"
+}
+```
+
+Run and artifact operations accept `X-Zenture-Error-Details: issues` to request safe validation details. Missing or unknown header values preserve the coarse envelope. The header changes only error representation; successful responses, authorization, admission, idempotency and retry behavior are unchanged.
+
+When available, `error.issues` contains 1–20 deduplicated entries. Each has a JSON Pointer `path` to a public argument and a closed `category`; optional `constraints` describe public bounds or allowed values. Input values, unknown key names and validator context are excluded. Details are omitted when unavailable, never null or an empty array.
+
+Example of a Run prepare error when details are requested:
+
+```json
+{
+  "error": {
+    "code": "validation_failed",
+    "message": "The request is invalid.",
+    "issues": [
+      {
+        "path": "/task",
+        "category": "required"
+      }
+    ]
+  },
+  "request_id": "req_00000000000000000000000000000000"
 }
 ```
 

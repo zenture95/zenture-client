@@ -18,6 +18,7 @@ from zenture._transport.base import (
     default_headers,
     extract_error_code,
     has_idempotency_key,
+    request_error_details,
     retry_delay,
 )
 from zenture.errors import (
@@ -142,6 +143,7 @@ class AsyncTransport:
         request_headers = self._request_headers(auth=auth)
         if headers is not None:
             request_headers.update(headers)
+        request_error_details(request_headers, path)
         try:
             if timeout is None:
                 stream = self._client.stream(
@@ -183,6 +185,7 @@ class AsyncTransport:
         request_headers = self._request_headers(auth=auth)
         if headers is not None:
             request_headers.update(headers)
+        request_error_details(request_headers, path)
 
         attempt = 1
         max_attempts = self._config.max_retries + 1

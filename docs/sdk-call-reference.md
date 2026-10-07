@@ -16,6 +16,13 @@ High-level `.run(...)` helpers create work and wait for a terminal operation.
 Low-level `.create(...)` or `.create_operation(...)` helpers return the initial
 `PublicOperationResponse` immediately.
 
+## Product Runs
+
+For every `client.runs.*` method, payload field, response meaning, and complete
+REST/MCP evaluation examples, use the [Run guide](run-guide.md). Product Runs
+have their own lifecycle; `runs.run()` does not have the create-and-wait behavior
+of `chat.run()` or `evaluations.run()` below.
+
 ## Response Wrappers
 
 `PublicOperationResponse` is returned by low-level mutating calls:

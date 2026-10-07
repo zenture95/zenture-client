@@ -13,6 +13,20 @@ CI tasks, and controlled notebook environments. zenture API tokens are
 server-side credentials. Do not put them in browsers, mobile apps, frontend
 bundles, public notebooks, logs, analytics, traces, or customer-visible errors.
 
+## Start here for agents
+
+Choose the interface, build a valid payload and interpret the result with the
+[Run guide](docs/run-guide.md). It covers REST and MCP side by side, field
+semantics, response shapes, pagination, uploads, feedback and recovery.
+For other REST resources use the [API reference](docs/api-reference.md).
+For MCP connection behavior use the [MCP guide](docs/mcp-client.md).
+
+A Run evaluates selected content; `client.runs.run()` starts it without polling.
+Save an explicit idempotency key before dispatch. A technically `completed` Run
+can still require revision; inspect `acceptance_decision` and result limitations.
+Current Run execution supports inline text. File registration is available, but
+Run preparation currently rejects `zenture_ref` inputs.
+
 ## Source migration
 
 This is a hard source cutover: install `zenture` and import `ZentureClient` or
@@ -144,6 +158,7 @@ with McpClient.connect() as client:  # uses the stored authorization
     run = client.run(
         task="Review the selected answer",
         artifact={"type": "text", "value": "selected answer"},
+        idempotency_key="review_case_123",  # persisted identity of this one review
     )
     print(client.get_run(run.run_id).run.status)
 ```

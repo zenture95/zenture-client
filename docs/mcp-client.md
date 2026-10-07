@@ -16,6 +16,18 @@ The MCP endpoint uses your zenture account, not an API token. Log in first, see
 zenture auth login
 ```
 
+## Payloads, results and complete workflows
+
+Start with the [Run guide](run-guide.md): it documents every tool argument,
+nested artifact/feedback fields, defaults, omitted versus null values, response
+interpretation, and the matching REST methods. `get_run()` returns a Python
+wrapper with `.run` and optional `.event_replay`; raw MCP structured content is
+the Run itself. `run()` starts work but does not poll to completion.
+
+Use the [complete MCP example](../examples/mcp_run_review.py) with stored
+authorization and a saved caller key. It waits within a budget and reads full
+content. No login or product call occurs merely by importing the example.
+
 ## Connecting
 
 `connect()` without `session` or `bearer_token` uses the stored authorization. It
@@ -63,6 +75,12 @@ A caller that already owns a credential can instead pass
 refresh, store or log it.
 
 ## Supported tools
+
+Run execution currently supports inline text. The schema retains `zenture_ref`,
+but Run preparation rejects registered-file inputs; registration does not enable
+file evaluation. Raw MCP `run` also supports `predecessor_run_id`; these Python
+MCP wrappers do not expose it yet. Use REST `runs.create()` / `runs.run()` for
+linked follow-ups from Python, preserving the predecessor on idempotent recovery.
 
 | Tool | Method | Purpose |
 |---|---|---|

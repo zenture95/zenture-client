@@ -15,6 +15,14 @@ The committed OpenAPI artifact remains the contract source of truth; this file i
 - Rate-limit data is returned as HTTP headers, not in response bodies.
 - Agentic chat is not a Public V1 mode and has no public SDK helper.
 
+## Product Run interpretation
+
+See the [Run guide](run-guide.md#interpret-the-returned-run) for current typed
+SDK interpretation and the distinction between technical completion, acceptance,
+result availability and Credits. Examples below illustrate wire shapes; use the
+current models and guide for optional/additive fields. MCP `get_run()` wraps its
+Run in `.run`, while REST `runs.get()` returns it directly.
+
 ## Endpoint Summary
 
 | Method | Endpoint | Success | SDK surface | SDK model |
@@ -31,16 +39,16 @@ The committed OpenAPI artifact remains the contract source of truth; this file i
 | `GET` | `/v1/limits` | `200` | `client.limits.get()` | `LimitsResponse` |
 | `GET` | `/v1/models` | `200` | `client.models.list(mode=None | "single" | "multi")` | `PublicModelListResponse` |
 | `GET` | `/v1/operations/{operation_id}` | `200` | `client.operations.get(...)`, `client.operations.wait(...)` | `PublicOperationResponse` |
-| `POST` | `/v1/run-artifacts` | `201` | `httpx` direct call | `PublicRunArtifactResponse` |
-| `POST` | `/v1/run-artifacts/signed-upload` | `200` | `httpx` direct call | `PublicSignedUploadResponse` |
-| `GET` | `/v1/runs` | `200` | `httpx` direct call | `PublicRunCollectionResponse` |
-| `POST` | `/v1/runs` | `200, 202` | `httpx` direct call | `PublicRunResponse` |
-| `POST` | `/v1/runs/prepare` | `200` | `httpx` direct call | `PrepareRunResponse` |
-| `GET` | `/v1/runs/{run_id}` | `200` | `httpx` direct call | `PublicRunResponse` |
-| `POST` | `/v1/runs/{run_id}/cancel` | `200` | `httpx` direct call | `PublicRunResponse` |
-| `GET` | `/v1/runs/{run_id}/events` | `200` | `httpx` direct call | `PublicRunEventsResponse` |
-| `GET` | `/v1/runs/{run_id}/events/stream` | `200` | `httpx` direct call | `string` |
-| `POST` | `/v1/runs/{run_id}/outcome` | `200` | `httpx` direct call | `PublicRunOutcomeResponse` |
+| `POST` | `/v1/run-artifacts` | `201` | `client.runs.attach_artifact(...)` | `PublicRunArtifactResponse` |
+| `POST` | `/v1/run-artifacts/signed-upload` | `200` | `client.runs.signed_upload(...)` | `PublicSignedUploadResponse` |
+| `GET` | `/v1/runs` | `200` | `client.runs.list(...)` | `PublicRunCollectionResponse` |
+| `POST` | `/v1/runs` | `200, 202` | `client.runs.create(...) / client.runs.run(...)` | `PublicRunResponse` |
+| `POST` | `/v1/runs/prepare` | `200` | `client.runs.prepare(...)` | `PrepareRunResponse` |
+| `GET` | `/v1/runs/{run_id}` | `200` | `client.runs.get(...)` | `PublicRunResponse` |
+| `POST` | `/v1/runs/{run_id}/cancel` | `200` | `client.runs.cancel(...)` | `PublicRunResponse` |
+| `GET` | `/v1/runs/{run_id}/events` | `200` | `client.runs.list_events(...)` | `PublicRunEventsResponse` |
+| `GET` | `/v1/runs/{run_id}/events/stream` | `200` | `client.runs.iter_events(...)` | `string` |
+| `POST` | `/v1/runs/{run_id}/outcome` | `200` | `client.runs.record_outcome(...)` | `PublicRunOutcomeResponse` |
 | `GET` | `/v1/usage` | `200` | `client.usage.get(...)` | `PublicUsageResponse` |
 | `GET` | `/v1/wallet` | `200` | `client.wallet.get()` | `PublicWalletResponse` |
 

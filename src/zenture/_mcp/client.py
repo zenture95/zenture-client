@@ -347,6 +347,13 @@ class McpClient:
                 raise failure
 
     def list_tools(self) -> tuple[str, ...]:
+        """Return advertised tool names as a tuple, without calling a product tool.
+
+        This method does not return descriptions, input/output schemas or annotations.
+        Use membership to check optional attach_artifact availability. Transport
+        failure raises ZentureMCPError; malformed catalogs raise ZentureMCPProtocolError.
+        """
+
         try:
             return _tool_names(self._transport.list_tools())
         except ZentureMCPError:
@@ -360,6 +367,13 @@ class McpClient:
             ) from exc
 
     def require_product_tools(self) -> None:
+        """Check that run, list_runs, get_run, cancel_run and record_run_outcome exist.
+
+        Returns None on success; missing core tools raise ZentureMCPProtocolError.
+        attach_artifact is optional. This check establishes discovery, not permission,
+        credits, file-byte availability or successful execution.
+        """
+
         names = set(self.list_tools())
         if not _REQUIRED_PRODUCT_TOOL_NAMES.issubset(names):
             raise ZentureMCPProtocolError("tool_catalog_incomplete")
@@ -390,6 +404,39 @@ class McpClient:
         profile: str = "standard",
         idempotency_key: str = cast("str", _OMITTED_RUN_KEY),
     ) -> McpRunResponse:
+        """Start evaluation of one explicitly selected answer; do not wait for completion.
+
+        Args:
+            task: Original user task and explicit evaluation criteria; non-blank,
+                at most 20,000 Unicode code points. Do not invent requirements.
+            artifact: Selected content as {"type": "text", "value": "..."} (1-50,000
+                code points). A bare URL is not selected text. The schema retains
+                zenture_ref, but Run preparation currently rejects registered-file
+                inputs; registration does not enable file evaluation.
+            profile: "standard" by default; "fast" and "detailed" require explicit
+                user intent. Actual capabilities and costs remain service-defined.
+            idempotency_key: Caller-owned key saved before dispatch. Reuse the same
+                key and identical request after an uncertain outcome; never use a new
+                key as a retry fallback. Keep credentials and personal data out of it.
+                MCP keys allow 1-128 ASCII letters, digits, _ or -. Omission generates
+                a random key per call; explicit None and whitespace are rejected.
+
+        Returns:
+            A PublicRunResponse-compatible object with run_id and possibly ongoing
+            status. Its idempotency_key attribute is excluded from model_dump();
+            persist the key separately before dispatch. Use get_run(run_id, view="summary") for
+            progress and get_run(run_id, view="full").run for available evaluation content.
+
+        Raises:
+            ValueError/ValidationError for local inputs; ZentureMCPError for safe
+            tool/transport failures (with the attempted key), and its subclass
+            ZentureMCPProtocolError for invalid results or mismatched receipts.
+
+        Starting may consume Credits or a Guest Trial slot. completed is technical
+        completion, not a ready acceptance decision. No automatic timeout/server-error
+        retry occurs. See docs/run-guide.md and docs/mcp-client.md for recovery.
+        """
+
         key = validate_run_idempotency_key(
             uuid4().hex if idempotency_key is _OMITTED_RUN_KEY else idempotency_key
         )
@@ -404,6 +451,23 @@ class McpClient:
     def attach_artifact(
         self, *, file_name: str, mime_type: str, byte_size: int, content_hash: str
     ) -> ArtifactUploadResponse:
+        """Register host-selected file bytes using matching metadata; does not start a Run.
+
+        Args:
+            file_name: Selected name, 1-255 characters; not a path.
+            mime_type: Actual media type, 1-127 characters, e.g. application/pdf.
+            byte_size: Exact selected byte count, 1-10,485,760 (10 MiB).
+            content_hash: SHA-256 of those bytes, 64 hexadecimal characters;
+                uppercase and surrounding whitespace are normalized.
+
+        Returns ArtifactUploadResponse with the registered artifact_ref. Registration
+        does not enable evaluation: Run preparation currently rejects zenture_ref.
+        The MCP host must supply the real bytes through its resolver. This method
+        neither reads a Python file nor sends bytes in JSON. Check list_tools() first;
+        an absent resolver cannot be repaired by inventing metadata or reselecting.
+        Invalid metadata raises ValidationError; tool failures raise ZentureMCPError.
+        """
+
         request = McpArtifactRequest(
             file_name=file_name,
             mime_type=mime_type,
@@ -425,6 +489,25 @@ class McpClient:
         limit: int = 5,
         cursor: str | None = None,
     ) -> ListRunsResponse:
+        """Return one compact page of owned Runs, newest first; never auto-page.
+
+        Args:
+            status: Categories active/completed/failed/cancelled; succeeded is a
+                deprecated completed alias. None or [] applies no status filter.
+            decision: ready/revise/human_review/insufficient_evidence; None or []
+                applies no decision filter.
+            profile: fast/standard/detailed; None or [] applies no profile filter.
+            created_after, created_before: ISO-8601 timestamps with timezone, or
+                None for open bounds; after must not be later than before.
+            limit: 1-50, default 5.
+            cursor: Previous next_cursor copied unchanged, or None for first page.
+
+        Returns ListRunsResponse with runs and next_cursor. Use get_run for details.
+        Preserve filters when following a cursor. Clarify ambiguous matches before
+        starting/cancelling a Run. Local invalid inputs raise ValidationError;
+        server-rejected filters and transport failures raise ZentureMCPError.
+        """
+
         return _parse_model(
             ListRunsResponse,
             self._call(
@@ -450,6 +533,23 @@ class McpClient:
         replay_limit: int = 50,
         include_event_replay: bool = False,
     ) -> McpRunRead:
+        """Read one owned Run without starting, retrying or cancelling evaluation.
+
+        Args:
+            run_id: Copy run_id from run or list_runs; never invent an identifier.
+            view: "summary" for progress (default), "full" for available results.
+            replay_cursor: Previous event_replay.next_cursor; None for first page.
+            replay_limit: 1-50 events, default 50.
+            include_event_replay: False by default. Set True to request replay;
+                a cursor alone does not enable it.
+
+        Returns a wrapper: .run is PublicRunResponse, .event_replay is the optional
+        ListRunEventsResponse. Read .run.safe_result_content availability before
+        using findings. Technical completion differs from acceptance_decision.
+        ValidationError rejects bad inputs; ZentureMCPError reports tool failures;
+        ZentureMCPProtocolError rejects a foreign run_id or malformed response.
+        """
+
         request = McpGetRunRequest(
             run_id=run_id,
             view=view,
@@ -468,6 +568,15 @@ class McpClient:
     def replay_events(
         self, run_id: str, *, cursor: str | None = None, limit: int = 50
     ) -> ListRunEventsResponse:
+        """Read one event page for an owned Run; no streaming or automatic pagination.
+
+        run_id comes from run/list_runs. cursor copies the previous next_cursor, or
+        None selects the first page. limit is 1-50 (default 50). Returns
+        ListRunEventsResponse with events, has_more and next_cursor. Uses get_run
+        with include_event_replay=True. Missing replay raises ZentureMCPProtocolError;
+        other tool/transport failures raise ZentureMCPError.
+        """
+
         read = self.get_run(
             run_id,
             replay_cursor=cursor,
@@ -479,6 +588,16 @@ class McpClient:
         return read.event_replay
 
     def cancel_run(self, run_id: str) -> PublicRunResponse:
+        """Request cancellation only for the user's explicit stop request.
+
+        run_id identifies one owned active Run; resolve ambiguity with list_runs
+        before calling. Returns PublicRunResponse. cancel_requested is pending:
+        read the same Run with get_run until its actual final state is known.
+        A timeout/disconnect does not authorize cancellation. Cancellation does not
+        promise a refund. Invalid IDs raise ValidationError; service errors raise
+        ZentureMCPError. No caller idempotency_key argument exists on this method.
+        """
+
         request = McpGetRunRequest(run_id=run_id)
         result = _parse_model(
             PublicRunResponse,
@@ -495,6 +614,24 @@ class McpClient:
         finding_adjudications: Sequence[dict[str, str]] | None = None,
         edited_artifact_ref: str | None = None,
     ) -> PublicRunResponse:
+        """Record explicit user feedback for one completed owned Run.
+
+        Args:
+            run_id: Existing Run ID from run/list_runs/get_run.
+            outcome: used (as-is), edited (after changes), rejected (not used),
+                escalated (further review), or not_sure (undecided).
+            finding_adjudications: Up to 20 {"finding_ref": "...", "outcome": "..."}
+                objects. Copy finding_ref from this Run's full result; each outcome
+                is confirmed/rejected/partially_valid/not_sure. None/[] skips them.
+            edited_artifact_ref: Registered owned art_... reference, required exactly
+                for edited; otherwise omit or use None. It is not an inline diff.
+
+        Returns the updated PublicRunResponse, preserving the original acceptance
+        verdict. Does not re-evaluate edited content. ValidationError rejects invalid
+        combinations; tool/transport failures raise ZentureMCPError. Do not infer
+        feedback from silence or comments. No caller idempotency_key is accepted.
+        """
+
         request = McpOutcomeRequest(
             run_id=run_id,
             outcome=outcome,
@@ -563,6 +700,15 @@ class AsyncMcpClient:
                 owned.close()
 
     async def list_tools(self) -> tuple[str, ...]:
+        """Return advertised tool names as a tuple, without calling a product tool.
+
+        This method does not return descriptions, input/output schemas or annotations.
+        Use membership to check optional attach_artifact availability. Transport
+        failure raises ZentureMCPError; malformed catalogs raise ZentureMCPProtocolError.
+
+        Async variant: await this call.
+        """
+
         try:
             return _tool_names(await self._transport.list_tools())
         except ZentureMCPError:
@@ -576,6 +722,15 @@ class AsyncMcpClient:
             ) from exc
 
     async def require_product_tools(self) -> None:
+        """Check that run, list_runs, get_run, cancel_run and record_run_outcome exist.
+
+        Returns None on success; missing core tools raise ZentureMCPProtocolError.
+        attach_artifact is optional. This check establishes discovery, not permission,
+        credits, file-byte availability or successful execution.
+
+        Async variant: await this call.
+        """
+
         names = set(await self.list_tools())
         if not _REQUIRED_PRODUCT_TOOL_NAMES.issubset(names):
             raise ZentureMCPProtocolError("tool_catalog_incomplete")
@@ -606,6 +761,41 @@ class AsyncMcpClient:
         profile: str = "standard",
         idempotency_key: str = cast("str", _OMITTED_RUN_KEY),
     ) -> McpRunResponse:
+        """Start evaluation of one explicitly selected answer; do not wait for completion.
+
+        Args:
+            task: Original user task and explicit evaluation criteria; non-blank,
+                at most 20,000 Unicode code points. Do not invent requirements.
+            artifact: Selected content as {"type": "text", "value": "..."} (1-50,000
+                code points). A bare URL is not selected text. The schema retains
+                zenture_ref, but Run preparation currently rejects registered-file
+                inputs; registration does not enable file evaluation.
+            profile: "standard" by default; "fast" and "detailed" require explicit
+                user intent. Actual capabilities and costs remain service-defined.
+            idempotency_key: Caller-owned key saved before dispatch. Reuse the same
+                key and identical request after an uncertain outcome; never use a new
+                key as a retry fallback. Keep credentials and personal data out of it.
+                MCP keys allow 1-128 ASCII letters, digits, _ or -. Omission generates
+                a random key per call; explicit None and whitespace are rejected.
+
+        Returns:
+            A PublicRunResponse-compatible object with run_id and possibly ongoing
+            status. Its idempotency_key attribute is excluded from model_dump();
+            persist the key separately before dispatch. Use get_run(run_id, view="summary") for
+            progress and get_run(run_id, view="full").run for available evaluation content.
+
+        Raises:
+            ValueError/ValidationError for local inputs; ZentureMCPError for safe
+            tool/transport failures (with the attempted key), and its subclass
+            ZentureMCPProtocolError for invalid results or mismatched receipts.
+
+        Starting may consume Credits or a Guest Trial slot. completed is technical
+        completion, not a ready acceptance decision. No automatic timeout/server-error
+        retry occurs. See docs/run-guide.md and docs/mcp-client.md for recovery.
+
+        Async variant: await this call.
+        """
+
         key = validate_run_idempotency_key(
             uuid4().hex if idempotency_key is _OMITTED_RUN_KEY else idempotency_key
         )
@@ -620,6 +810,25 @@ class AsyncMcpClient:
     async def attach_artifact(
         self, *, file_name: str, mime_type: str, byte_size: int, content_hash: str
     ) -> ArtifactUploadResponse:
+        """Register host-selected file bytes using matching metadata; does not start a Run.
+
+        Args:
+            file_name: Selected name, 1-255 characters; not a path.
+            mime_type: Actual media type, 1-127 characters, e.g. application/pdf.
+            byte_size: Exact selected byte count, 1-10,485,760 (10 MiB).
+            content_hash: SHA-256 of those bytes, 64 hexadecimal characters;
+                uppercase and surrounding whitespace are normalized.
+
+        Returns ArtifactUploadResponse with the registered artifact_ref. Registration
+        does not enable evaluation: Run preparation currently rejects zenture_ref.
+        The MCP host must supply the real bytes through its resolver. This method
+        neither reads a Python file nor sends bytes in JSON. Check list_tools() first;
+        an absent resolver cannot be repaired by inventing metadata or reselecting.
+        Invalid metadata raises ValidationError; tool failures raise ZentureMCPError.
+
+        Async variant: await this call.
+        """
+
         request = McpArtifactRequest(
             file_name=file_name,
             mime_type=mime_type,
@@ -642,6 +851,27 @@ class AsyncMcpClient:
         limit: int = 5,
         cursor: str | None = None,
     ) -> ListRunsResponse:
+        """Return one compact page of owned Runs, newest first; never auto-page.
+
+        Args:
+            status: Categories active/completed/failed/cancelled; succeeded is a
+                deprecated completed alias. None or [] applies no status filter.
+            decision: ready/revise/human_review/insufficient_evidence; None or []
+                applies no decision filter.
+            profile: fast/standard/detailed; None or [] applies no profile filter.
+            created_after, created_before: ISO-8601 timestamps with timezone, or
+                None for open bounds; after must not be later than before.
+            limit: 1-50, default 5.
+            cursor: Previous next_cursor copied unchanged, or None for first page.
+
+        Returns ListRunsResponse with runs and next_cursor. Use get_run for details.
+        Preserve filters when following a cursor. Clarify ambiguous matches before
+        starting/cancelling a Run. Local invalid inputs raise ValidationError;
+        server-rejected filters and transport failures raise ZentureMCPError.
+
+        Async variant: await this call.
+        """
+
         return _parse_model(
             ListRunsResponse,
             await self._call(
@@ -667,6 +897,25 @@ class AsyncMcpClient:
         replay_limit: int = 50,
         include_event_replay: bool = False,
     ) -> McpRunRead:
+        """Read one owned Run without starting, retrying or cancelling evaluation.
+
+        Args:
+            run_id: Copy run_id from run or list_runs; never invent an identifier.
+            view: "summary" for progress (default), "full" for available results.
+            replay_cursor: Previous event_replay.next_cursor; None for first page.
+            replay_limit: 1-50 events, default 50.
+            include_event_replay: False by default. Set True to request replay;
+                a cursor alone does not enable it.
+
+        Returns a wrapper: .run is PublicRunResponse, .event_replay is the optional
+        ListRunEventsResponse. Read .run.safe_result_content availability before
+        using findings. Technical completion differs from acceptance_decision.
+        ValidationError rejects bad inputs; ZentureMCPError reports tool failures;
+        ZentureMCPProtocolError rejects a foreign run_id or malformed response.
+
+        Async variant: await this call.
+        """
+
         request = McpGetRunRequest(
             run_id=run_id,
             view=view,
@@ -685,6 +934,17 @@ class AsyncMcpClient:
     async def replay_events(
         self, run_id: str, *, cursor: str | None = None, limit: int = 50
     ) -> ListRunEventsResponse:
+        """Read one event page for an owned Run; no streaming or automatic pagination.
+
+        run_id comes from run/list_runs. cursor copies the previous next_cursor, or
+        None selects the first page. limit is 1-50 (default 50). Returns
+        ListRunEventsResponse with events, has_more and next_cursor. Uses get_run
+        with include_event_replay=True. Missing replay raises ZentureMCPProtocolError;
+        other tool/transport failures raise ZentureMCPError.
+
+        Async variant: await this call.
+        """
+
         read = await self.get_run(
             run_id,
             replay_cursor=cursor,
@@ -696,6 +956,18 @@ class AsyncMcpClient:
         return read.event_replay
 
     async def cancel_run(self, run_id: str) -> PublicRunResponse:
+        """Request cancellation only for the user's explicit stop request.
+
+        run_id identifies one owned active Run; resolve ambiguity with list_runs
+        before calling. Returns PublicRunResponse. cancel_requested is pending:
+        read the same Run with get_run until its actual final state is known.
+        A timeout/disconnect does not authorize cancellation. Cancellation does not
+        promise a refund. Invalid IDs raise ValidationError; service errors raise
+        ZentureMCPError. No caller idempotency_key argument exists on this method.
+
+        Async variant: await this call.
+        """
+
         request = McpGetRunRequest(run_id=run_id)
         result = _parse_model(
             PublicRunResponse,
@@ -712,6 +984,26 @@ class AsyncMcpClient:
         finding_adjudications: Sequence[dict[str, str]] | None = None,
         edited_artifact_ref: str | None = None,
     ) -> PublicRunResponse:
+        """Record explicit user feedback for one completed owned Run.
+
+        Args:
+            run_id: Existing Run ID from run/list_runs/get_run.
+            outcome: used (as-is), edited (after changes), rejected (not used),
+                escalated (further review), or not_sure (undecided).
+            finding_adjudications: Up to 20 {"finding_ref": "...", "outcome": "..."}
+                objects. Copy finding_ref from this Run's full result; each outcome
+                is confirmed/rejected/partially_valid/not_sure. None/[] skips them.
+            edited_artifact_ref: Registered owned art_... reference, required exactly
+                for edited; otherwise omit or use None. It is not an inline diff.
+
+        Returns the updated PublicRunResponse, preserving the original acceptance
+        verdict. Does not re-evaluate edited content. ValidationError rejects invalid
+        combinations; tool/transport failures raise ZentureMCPError. Do not infer
+        feedback from silence or comments. No caller idempotency_key is accepted.
+
+        Async variant: await this call.
+        """
+
         request = McpOutcomeRequest(
             run_id=run_id,
             outcome=outcome,

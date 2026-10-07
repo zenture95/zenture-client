@@ -23,6 +23,25 @@ usage.
 
 ## Resource Index
 
+### Product Runs
+
+Use `client.runs` to evaluate selected content against a task and obtain an
+acceptance decision, findings and coverage. See the [Run guide](run-guide.md)
+for complete payloads, methods, return shapes and recovery. It also explains
+when to use the evaluation-specific API below.
+
+- `prepare(...)` inspects a proposal; `create(...)` starts that proposal.
+- `run(...)` prepares and starts; it does not poll to completion.
+- `get(...)`, `list(...)`, `wait(...)` read status and available results.
+- `list_events(...)` replays one page; `iter_events(...)` streams events.
+- `signed_upload(...)`, `attach_artifact(...)` authorize and send file bytes for
+  registration. Run preparation currently rejects `zenture_ref`; registration
+  does not enable file evaluation.
+- `cancel(...)` requests cancellation; `record_outcome(...)` records feedback.
+
+Run pages use limits 1-50 and cursors up to 512 characters, unlike the older
+chat/evaluation pagination defaults below. Async variants use the same resource.
+
 ### Connectivity
 
 - `client.helloworld()`: quick connectivity check. See

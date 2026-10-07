@@ -62,3 +62,31 @@ Exceptions must not expose API tokens, Authorization headers, prompts, answers,
 raw request bodies, raw response bodies, JWTs, provider payloads, or billing
 internals. Do not add logs that print exception internals without considering
 redaction.
+
+## Run and MCP recovery
+
+Local `ValueError` / Pydantic `ValidationError` means the caller must correct
+inputs. Inspect the documented field contract; do not print validation payloads.
+REST failures use `ZentureAPIError` subclasses. MCP product/transport failures
+use `ZentureMCPError` and `ZentureMCPProtocolError` from `zenture.errors`.
+MCP authorization failures use the distinct exceptions in `zenture.auth`.
+
+| MCP next_action | Caller response |
+|---|---|
+| `check_request` | Review the input fields and combinations. The current error may not identify the exact field; do not guess values |
+| `check_run_id` | Read the known Run, or search a bounded recent owned list; clarify ambiguous matches |
+| `retry_later` | Respect retry_after_seconds when present; preserve the Run ID and original key/request |
+| `reauthorize` | Explain that the human must restore authorization; do not launch login as an agent |
+| `reattach_file` | Reselect a missing source if the host supports file bytes; reselection cannot add a missing resolver |
+
+`retryable=True` does not authorize a replacement chargeable Run. After an
+uncertain start, recover with the saved original key and identical request.
+If no key exists, use bounded owned readback; an empty page is not proof that
+nothing started. Never fall back to a new key to bypass a conflict or expiry.
+
+`ZentureMCPError.idempotency_key` retains the attempted Run key; save keys before
+dispatch because cancellation can propagate without an error receipt. A receipt
+proves identity, not completion or billing. `ZenturePollingTimeoutError` and
+`ZenturePollingStoppedError` from REST Run waiting keep run_id in `operation_id`;
+read that Run later. Neither stops server execution. The sample MCP polling
+workflow follows the same rule.

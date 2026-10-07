@@ -96,6 +96,7 @@ def test_malformed_predecessor_fails_locally_before_any_request(bad: str) -> Non
 
 def test_closed_predecessor_error_is_a_typed_public_error_code() -> None:
     bodies: list[dict[str, object]] = []
+    error: dict[str, object]
     error = {"error": {"code": "predecessor_run_invalid", "message": "The predecessor run is not available."},
              "request_id": "req_00000000000000000000000000000000"}
     client = _sync_client(bodies, status=422, payload=error)

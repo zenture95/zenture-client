@@ -1315,6 +1315,7 @@ Stable public gateway error codes are:
 - `proposal_hash_mismatch`
 - `predecessor_run_invalid`
 - `account_required`
+- `legal_consent_required`
 - `artifact_required`
 - `artifact_ambiguous`
 - `artifact_unavailable`

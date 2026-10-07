@@ -58,6 +58,7 @@ class PublicErrorCode(StrEnum):
     PROPOSAL_HASH_MISMATCH = "proposal_hash_mismatch"
     PREDECESSOR_RUN_INVALID = "predecessor_run_invalid"
     ACCOUNT_REQUIRED = "account_required"
+    LEGAL_CONSENT_REQUIRED = "legal_consent_required"
     ARTIFACT_REQUIRED = "artifact_required"
     ARTIFACT_AMBIGUOUS = "artifact_ambiguous"
     ARTIFACT_UNAVAILABLE = "artifact_unavailable"

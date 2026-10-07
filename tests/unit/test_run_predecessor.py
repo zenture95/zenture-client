@@ -135,3 +135,29 @@ def test_async_create_and_run_send_the_predecessor() -> None:
     asyncio.run(scenario())
     linked = {"proposal_id": PROPOSAL_ID, "proposal_hash": PROPOSAL_HASH, "predecessor_run_id": PREDECESSOR}
     assert bodies == [linked, linked, {"proposal_id": PROPOSAL_ID, "proposal_hash": PROPOSAL_HASH}]
+
+
+@pytest.mark.parametrize("path_failure", ["prepare", "create"])
+def test_missing_legal_consent_is_a_typed_non_retried_403(path_failure: str) -> None:
+    calls: list[str] = []
+    envelope = {"error": {"code": "legal_consent_required", "message": "Accept the current Terms and Privacy Policy."},
+                "request_id": "req_00000000000000000000000000000000"}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        calls.append(request.url.path)
+        return httpx.Response(403, json=envelope)
+
+    client = ZentureClient(
+        api_key=API_KEY, http_client=httpx.Client(transport=httpx.MockTransport(handler)), max_retries=2)
+    try:
+        with pytest.raises(ZentureAPIError) as caught:
+            if path_failure == "create":
+                client.runs.create(proposal_id=PROPOSAL_ID, proposal_hash=PROPOSAL_HASH, idempotency_key="k")
+            else:
+                client.runs.prepare(task="Review this answer.", artifact={"type": "text", "value": "answer"})
+    finally:
+        client.close()
+    assert caught.value.error_code == "legal_consent_required"
+    assert caught.value.status_code == 403
+    assert PublicErrorCode("legal_consent_required") is PublicErrorCode.LEGAL_CONSENT_REQUIRED
+    assert len(calls) == 1

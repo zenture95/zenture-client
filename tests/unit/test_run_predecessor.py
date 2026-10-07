@@ -154,7 +154,7 @@ def test_missing_legal_consent_is_a_typed_non_retried_403(path_failure: str) -> 
             if path_failure == "create":
                 client.runs.create(proposal_id=PROPOSAL_ID, proposal_hash=PROPOSAL_HASH, idempotency_key="k")
             else:
-                client.runs.prepare(task="Review this answer.", artifact={"type": "text", "value": "answer"})
+                client.runs.prepare(task="Review this answer.", artifact={"type": "text", "value": "answer"}, idempotency_key="k")
     finally:
         client.close()
     assert caught.value.error_code == "legal_consent_required"

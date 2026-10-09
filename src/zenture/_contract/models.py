@@ -165,7 +165,7 @@ class UnavailableCreditAmount(_RunResponseModel):
         "missing_scale",
         "unsupported_scale",
         "legacy_unbound_scale",
-        "billing_projection_unavailable",
+        "billing_summary_unavailable",
     ]
 
 
@@ -181,15 +181,15 @@ class PrepareCreditsProjectionV1(_RunResponseModel):
     maximum_credits: CreditAmountProjectionV1
 
 
-class TerminalBillingProjectionV1(_RunResponseModel):
-    schema_version: Literal["run.terminal_billing_projection.v1"] = (
-        "run.terminal_billing_projection.v1"
+class TerminalBillingSummaryV1(_RunResponseModel):
+    schema_version: Literal["run.terminal_billing_summary.v1"] = (
+        "run.terminal_billing_summary.v1"
     )
     status: Literal["pending", "settled", "released", "unavailable"]
     final_credits: CreditAmountProjectionV1 | None = None
 
     @model_validator(mode="after")
-    def _status_matches_amount(self) -> TerminalBillingProjectionV1:
+    def _status_matches_amount(self) -> TerminalBillingSummaryV1:
         if self.status == "pending" and self.final_credits is not None:
             raise ValueError("pending billing must not expose final Credits")
         if self.status != "pending" and self.final_credits is None:
@@ -887,17 +887,7 @@ class PublicRunResponse(_RunResponseModel):
     next_action: str | None = Field(default=None, max_length=128)
     run_insight_ref: str | None = Field(default=None, max_length=256)
     artifact_refs: tuple[str, ...] = Field(default_factory=tuple, max_length=16)
-    usage_summary: dict[str, int] = Field(
-        default_factory=dict,
-        max_length=8,
-        description="Deprecated additive compatibility field; use billing_projection.",
-    )
-    billing_summary: dict[str, str] = Field(
-        default_factory=dict,
-        max_length=8,
-        description="Deprecated additive compatibility field; use billing_projection.",
-    )
-    billing_projection: TerminalBillingProjectionV1 | None = None
+    billing_summary: TerminalBillingSummaryV1 | None = None
     limitations: tuple[str, ...] = Field(default_factory=tuple, max_length=32)
     safe_result_content: SafeResultContentProjectionV1 | None = None
     cancellation_requested: bool = False
@@ -954,7 +944,9 @@ class PublicRunResponse(_RunResponseModel):
 class PublicRunListItem(_RunResponseModel):
     run_id: str = Field(pattern=r"^run_[A-Za-z0-9_-]{3,128}$")
     status: RunStatus
+    title: str | None = Field(default=None, max_length=80)
     decision: PublicDecision | None = None
+    error_code: str | None = Field(default=None, max_length=128)
     task_summary_ref: str | None = None
     profile: RunProfile
     created_at: AwareDatetime

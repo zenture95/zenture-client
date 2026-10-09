@@ -267,10 +267,10 @@ def test_mutation_request_models_required_fields_match_openapi() -> None:
 
 
 def test_sdk_tolerates_omitted_pending_amount_without_changing_openapi_contract() -> None:
-    from zenture._contract import TerminalBillingProjectionV1
+    from zenture._contract import TerminalBillingSummaryV1
 
-    assert "final_credits" not in TerminalBillingProjectionV1.model_json_schema()["required"]
-    assert "final_credits" in _schemas()["TerminalBillingProjectionV1"]["required"]
+    assert "final_credits" not in TerminalBillingSummaryV1.model_json_schema()["required"]
+    assert "final_credits" in _schemas()["TerminalBillingSummaryV1"]["required"]
 
 
 def test_phase_four_response_models_match_required_fields() -> None:

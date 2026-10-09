@@ -681,11 +681,13 @@ Schema: `PublicRunCollectionResponse`
     {
       "created_at": "2026-06-15T10:00:00Z",
       "deadline_at": "example",
-      "decision": "example",
+      "decision": "ready",
+      "error_code": "example",
       "profile": "fast",
       "run_id": "example",
       "status": "active",
       "task_summary_ref": "example",
+      "title": "example",
       "updated_at": "2026-06-15T10:00:30Z"
     }
   ]
@@ -726,12 +728,11 @@ Schema: `PublicRunResponse`
   "artifact_refs": [
     "example"
   ],
-  "billing_projection": {
+  "billing_summary": {
     "final_credits": "example",
-    "schema_version": "run.terminal_billing_projection.v1",
+    "schema_version": "run.terminal_billing_summary.v1",
     "status": "pending"
   },
-  "billing_summary": {},
   "cancellation_requested": true,
   "capability_coverage": {
     "available_refs": [
@@ -774,7 +775,6 @@ Schema: `PublicRunResponse`
     "work_type": "example"
   },
   "updated_at": "2026-06-15T10:00:30Z",
-  "usage_summary": {},
   "work_type": "example"
 }
 ```
@@ -789,12 +789,11 @@ Schema: `PublicRunResponse`
   "artifact_refs": [
     "example"
   ],
-  "billing_projection": {
+  "billing_summary": {
     "final_credits": "example",
-    "schema_version": "run.terminal_billing_projection.v1",
+    "schema_version": "run.terminal_billing_summary.v1",
     "status": "pending"
   },
-  "billing_summary": {},
   "cancellation_requested": true,
   "capability_coverage": {
     "available_refs": [
@@ -837,7 +836,6 @@ Schema: `PublicRunResponse`
     "work_type": "example"
   },
   "updated_at": "2026-06-15T10:00:30Z",
-  "usage_summary": {},
   "work_type": "example"
 }
 ```
@@ -928,12 +926,11 @@ Schema: `PublicRunResponse`
   "artifact_refs": [
     "example"
   ],
-  "billing_projection": {
+  "billing_summary": {
     "final_credits": "example",
-    "schema_version": "run.terminal_billing_projection.v1",
+    "schema_version": "run.terminal_billing_summary.v1",
     "status": "pending"
   },
-  "billing_summary": {},
   "cancellation_requested": true,
   "capability_coverage": {
     "available_refs": [
@@ -976,7 +973,6 @@ Schema: `PublicRunResponse`
     "work_type": "example"
   },
   "updated_at": "2026-06-15T10:00:30Z",
-  "usage_summary": {},
   "work_type": "example"
 }
 ```
@@ -1013,12 +1009,11 @@ Schema: `PublicRunResponse`
   "artifact_refs": [
     "example"
   ],
-  "billing_projection": {
+  "billing_summary": {
     "final_credits": "example",
-    "schema_version": "run.terminal_billing_projection.v1",
+    "schema_version": "run.terminal_billing_summary.v1",
     "status": "pending"
   },
-  "billing_summary": {},
   "cancellation_requested": true,
   "capability_coverage": {
     "available_refs": [
@@ -1061,7 +1056,6 @@ Schema: `PublicRunResponse`
     "work_type": "example"
   },
   "updated_at": "2026-06-15T10:00:30Z",
-  "usage_summary": {},
   "work_type": "example"
 }
 ```
@@ -1176,12 +1170,11 @@ Schema: `PublicRunOutcomeResponse`
   "artifact_refs": [
     "example"
   ],
-  "billing_projection": {
+  "billing_summary": {
     "final_credits": "example",
-    "schema_version": "run.terminal_billing_projection.v1",
+    "schema_version": "run.terminal_billing_summary.v1",
     "status": "pending"
   },
-  "billing_summary": {},
   "cancellation_requested": true,
   "capability_coverage": {
     "available_refs": [
@@ -1224,7 +1217,6 @@ Schema: `PublicRunOutcomeResponse`
     "work_type": "example"
   },
   "updated_at": "2026-06-15T10:00:30Z",
-  "usage_summary": {},
   "work_type": "example"
 }
 ```

@@ -204,8 +204,7 @@ it does **not** have the Python wrapper's extra `run` level.
 | `artifact_refs`, `run_insight_ref`, result references | Opaque identifiers to preserve; do not synthesize URLs or decode them |
 | `cancellation_requested` | Requested cancellation; the actual `status` remains authoritative |
 | `event_cursor` | Opaque event checkpoint, usable for supported replay/stream resumption; distinct from `event_id` and the Run-list cursor |
-| `billing_projection` | `pending`, `settled`, `released` or `unavailable`. `final_credits.status="available"` carries decimal-string `amount` and `unit="credits"`; unavailable/null is not zero |
-| `billing_summary`, `usage_summary` | Deprecated compatibility fields; prefer billing_projection |
+| `billing_summary` | `pending`, `settled`, `released` or `unavailable`. `final_credits.status="available"` carries decimal-string `amount` and `unit="credits"`; unavailable/null is not zero |
 
 Report technical status, acceptance decision, relevant findings and limitations
 separately. `ready` is scoped to the evaluated requirements and evidence, not a

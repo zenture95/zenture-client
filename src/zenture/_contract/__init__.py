@@ -63,7 +63,7 @@ from zenture._contract.models import (
     SafeResultContentProjectionV1,
     SafeResultContentUnavailableV1,
     SignedUploadResponse,
-    TerminalBillingProjectionV1,
+    TerminalBillingSummaryV1,
     UnavailableCreditAmount,
     UsageScope,
 )
@@ -131,7 +131,7 @@ __all__ = (
     "SafeResultContentProjectionV1",
     "SafeResultContentUnavailableV1",
     "SignedUploadResponse",
-    "TerminalBillingProjectionV1",
+    "TerminalBillingSummaryV1",
     "UnavailableCreditAmount",
     "UsageScope",
     "parse_rate_limit_headers",

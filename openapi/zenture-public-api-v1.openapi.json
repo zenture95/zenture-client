@@ -1761,6 +1761,22 @@
             ]
           },
           "decision": {
+            "description": "Acceptance decision; null while non-terminal or when the Run has no result.",
+            "enum": [
+              "ready",
+              "revise",
+              "human_review",
+              "insufficient_evidence",
+              null
+            ],
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "error_code": {
+            "description": "Closed public terminal reason code for failed, cancelled, expired or budget_exhausted Runs; null otherwise.",
+            "maxLength": 128,
             "type": [
               "string",
               "null"
@@ -1783,6 +1799,14 @@
             "type": "string"
           },
           "task_summary_ref": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "title": {
+            "description": "Safe plain-text Run title; null when absent.",
+            "maxLength": 80,
             "type": [
               "string",
               "null"
@@ -1828,21 +1852,15 @@
             "maxItems": 16,
             "type": "array"
           },
-          "billing_projection": {
+          "billing_summary": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/TerminalBillingProjectionV1"
+                "$ref": "#/components/schemas/TerminalBillingSummaryV1"
               },
               {
                 "type": "null"
               }
             ]
-          },
-          "billing_summary": {
-            "additionalProperties": {
-              "type": "string"
-            },
-            "type": "object"
           },
           "cancellation_requested": {
             "default": false,
@@ -1988,12 +2006,6 @@
           "updated_at": {
             "format": "date-time",
             "type": "string"
-          },
-          "usage_summary": {
-            "additionalProperties": {
-              "type": "integer"
-            },
-            "type": "object"
           },
           "work_type": {
             "maxLength": 64,
@@ -2039,21 +2051,15 @@
             "maxItems": 16,
             "type": "array"
           },
-          "billing_projection": {
+          "billing_summary": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/TerminalBillingProjectionV1"
+                "$ref": "#/components/schemas/TerminalBillingSummaryV1"
               },
               {
                 "type": "null"
               }
             ]
-          },
-          "billing_summary": {
-            "additionalProperties": {
-              "type": "string"
-            },
-            "type": "object"
           },
           "cancellation_requested": {
             "default": false,
@@ -2199,12 +2205,6 @@
           "updated_at": {
             "format": "date-time",
             "type": "string"
-          },
-          "usage_summary": {
-            "additionalProperties": {
-              "type": "integer"
-            },
-            "type": "object"
           },
           "work_type": {
             "maxLength": 64,
@@ -2754,7 +2754,7 @@
         ],
         "type": "object"
       },
-      "TerminalBillingProjectionV1": {
+      "TerminalBillingSummaryV1": {
         "additionalProperties": true,
         "properties": {
           "final_credits": {
@@ -2768,7 +2768,7 @@
             ]
           },
           "schema_version": {
-            "const": "run.terminal_billing_projection.v1"
+            "const": "run.terminal_billing_summary.v1"
           },
           "status": {
             "enum": [
@@ -2817,7 +2817,7 @@
               "missing_scale",
               "unsupported_scale",
               "legacy_unbound_scale",
-              "billing_projection_unavailable"
+              "billing_summary_unavailable"
             ],
             "type": "string"
           },

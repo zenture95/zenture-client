@@ -320,19 +320,19 @@ def test_mcp_start_accepts_pending_billing_with_absent_or_null_amount(
     final_credits: object,
 ) -> None:
     projection: dict[str, object] = {
-        "schema_version": "run.terminal_billing_projection.v1",
+        "schema_version": "run.terminal_billing_summary.v1",
         "status": "pending",
     }
     if final_credits != "omitted":
         projection["final_credits"] = final_credits
-    payload = {**_run(status="queued"), "billing_projection": projection}
+    payload = {**_run(status="queued"), "billing_summary": projection}
 
     run = McpClient(RecordingTransport({"run": payload})).run(
         task="Review this answer", artifact={"type": "text", "value": "text"}
     )
 
-    assert run.billing_projection is not None
-    assert run.billing_projection.final_credits is None
+    assert run.billing_summary is not None
+    assert run.billing_summary.final_credits is None
 
 
 @pytest.mark.parametrize("status", ["settled", "released", "unavailable"])
@@ -341,12 +341,12 @@ def test_mcp_start_rejects_terminal_billing_without_typed_amount(
     status: str, final_credits: object
 ) -> None:
     projection: dict[str, object] = {
-        "schema_version": "run.terminal_billing_projection.v1",
+        "schema_version": "run.terminal_billing_summary.v1",
         "status": status,
     }
     if final_credits != "omitted":
         projection["final_credits"] = final_credits
-    payload = {**_run(status="queued"), "billing_projection": projection}
+    payload = {**_run(status="queued"), "billing_summary": projection}
 
     with pytest.raises(ZentureMCPProtocolError, match="invalid_result_contract"):
         McpClient(RecordingTransport({"run": payload})).run(
@@ -357,8 +357,8 @@ def test_mcp_start_rejects_terminal_billing_without_typed_amount(
 def test_mcp_start_rejects_pending_billing_with_final_amount() -> None:
     payload = {
         **_run(status="queued"),
-        "billing_projection": {
-            "schema_version": "run.terminal_billing_projection.v1",
+        "billing_summary": {
+            "schema_version": "run.terminal_billing_summary.v1",
             "status": "pending",
             "final_credits": {"status": "available", "amount": "1.00", "unit": "credits"},
         },
@@ -373,8 +373,8 @@ def test_mcp_start_rejects_pending_billing_with_final_amount() -> None:
 def test_mcp_start_preserves_terminal_billing_amount_validation() -> None:
     payload = {
         **_run(status="queued"),
-        "billing_projection": {
-            "schema_version": "run.terminal_billing_projection.v1",
+        "billing_summary": {
+            "schema_version": "run.terminal_billing_summary.v1",
             "status": "settled",
             "final_credits": {"status": "available", "amount": "1.00", "unit": "credits"},
         },
@@ -384,11 +384,11 @@ def test_mcp_start_preserves_terminal_billing_amount_validation() -> None:
         task="Review this answer", artifact={"type": "text", "value": "text"}
     )
 
-    assert run.billing_projection is not None
-    assert run.billing_projection.status == "settled"
-    assert run.billing_projection.final_credits is not None
-    assert run.billing_projection.final_credits.status == "available"
-    assert run.billing_projection.final_credits.amount == "1.00"
+    assert run.billing_summary is not None
+    assert run.billing_summary.status == "settled"
+    assert run.billing_summary.final_credits is not None
+    assert run.billing_summary.final_credits.status == "available"
+    assert run.billing_summary.final_credits.amount == "1.00"
 
 
 @pytest.mark.asyncio

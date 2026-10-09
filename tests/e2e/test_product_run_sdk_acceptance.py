@@ -67,11 +67,9 @@ async def test_product_run_sdk_acceptance(profile: RunProfile) -> None:
     assert report.full.safe_result_content.content.evidence_summaries is not None
     assert report.full.safe_result_content.content.limitations is not None
     assert report.full.safe_result_content.content.decision.next_action
-    assert report.full.billing_projection is not None
-    assert report.full.billing_projection.status in {"settled", "released"}
-    assert report.full.billing_projection.final_credits is not None
-    assert report.full.billing_projection.final_credits.status == "available"
-    assert report.full.usage_summary == {}
-    assert report.full.billing_summary == {}
+    assert report.full.billing_summary is not None
+    assert report.full.billing_summary.status in {"settled", "released"}
+    assert report.full.billing_summary.final_credits is not None
+    assert report.full.billing_summary.final_credits.status == "available"
     assert report.event_replay.events
     assert all(event.run_id == report.run_id for event in report.event_replay.events)
